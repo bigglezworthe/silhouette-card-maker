@@ -2,6 +2,7 @@ import os
 
 import click
 from utilities import CardSize, PaperSize, generate_pdf
+from remove_images import empty_folders
 
 front_directory = os.path.join('game', 'front')
 back_directory = os.path.join('game', 'back')
@@ -25,6 +26,7 @@ default_output_path = os.path.join(output_directory, 'game.pdf')
 @click.option("--quality", default=75, type=click.IntRange(min=0, max=100), show_default=True, help="File compression. A higher value corresponds to better quality and larger file size.")
 @click.option("--load_offset", default=False, is_flag=True, help="Apply saved offsets. See `offset_pdf.py` for more information.")
 @click.option("--name", help="Label each page of the PDF with a name.")
+@click.option("--delete_images", default=False, is_flag=True, help="Deletes image files after creating PDF.")
 
 def cli(
     front_dir_path,
@@ -40,7 +42,8 @@ def cli(
     ppi,
     quality,
     load_offset,
-    name
+    name,
+    delete_images
 ):
     generate_pdf(
         front_dir_path,
@@ -58,6 +61,9 @@ def cli(
         load_offset,
         name
     )
+
+    if delete_images:
+        empty_folders([front_dir_path, double_sided_dir_path])
 
 if __name__ == '__main__':
     cli()
