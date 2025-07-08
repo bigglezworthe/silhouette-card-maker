@@ -93,13 +93,28 @@ def get_back_card_image_path(back_dir_path) -> str | None:
     # The directory may contain markdown files
     files = [f for f in os.listdir(back_dir_path) if (os.path.isfile(os.path.join(back_dir_path, f)) and not f.endswith(".md"))]
 
-    # Check if there is exactly one file
+
     if len(files) == 0:
         return None
-    elif len(files) == 1:
+    
+    if len(files) == 1:
         return os.path.join(back_dir_path, files[0])
-    else:
-        raise Exception(f'Back image directory path "{back_dir_path}" contains more than one image. Files include "{files}".')
+
+    for i, f in enumerate(files):
+        print(f'[{i+1}] {f}')
+
+    while True:
+        choice = input("Enter the number of the file to use as the back image: ")
+        if not choice.isdigit():
+            continue
+
+        choice = int(choice)-1
+        if choice < len(files) and choice >= 0: 
+            break
+
+    return os.path.join(back_dir_path,files[choice])
+
+        #raise Exception(f'Back image directory path "{back_dir_path}" contains more than one image. Files include "{files}".')
 
 def draw_card_with_bleed(card_image: Image, base_image: Image, box: tuple[int, int, int, int], print_bleed: tuple[int, int]):
     origin_x, origin_y, _, _ = box
