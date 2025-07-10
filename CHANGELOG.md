@@ -1,3 +1,7 @@
+## 1.1.3
+
+-- Added `mpc_crop.py` per user request
+
 ## 1.1.2
 
 - Switched to semantic version numbering

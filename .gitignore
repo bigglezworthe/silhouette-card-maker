@@ -13,6 +13,8 @@ game/output/*
 !game/output/EMPTY.md
 game/decklist/*
 !game/decklist/EMPTY.md
+game/crop/*
+!game/crop/EMPTY.md
 
 data
 
