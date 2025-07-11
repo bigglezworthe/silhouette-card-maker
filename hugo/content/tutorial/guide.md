@@ -190,10 +190,10 @@ Now you're ready to play with your cards!
 
 ## Next Steps
 
-As mentioned, the `create_pdf.py` script offers many [configuration options]({{% ref "../docs/create.md" %}}). `create_pdf.py` can create double-sided cards, utilize different paper sizes, cut different card sizes, and more!
+Please join our [Discord server](https://discord.gg/jhsKmAgbXc)! While you're there, go to `#roles` and give yourself the `SCM Graduate` role for completing the tutorial! Share some pictures in `#photo-showcase` as well!
 
-If you're interested in making proxies for TCGs, try using a [plugin]({{% ref "../plugins" %}}). For example, the [Magic: The Gathering plugin]({{% ref "../plugins/mtg.md" %}}) reads a decklist and automatically fetches card art.
+As mentioned previously, the `create_pdf.py` script offers many [configuration options]({{% ref "../docs/create.md" %}}). `create_pdf.py` can make double-sided cards, use different paper sizes, cut various card sizes, and more!
 
-Lastly, we have a [Discord server](https://discord.gg/jhsKmAgbXc)! We'd love to see you there! You can ask for help, share pictures, and chat with people who all love creating and playing card games.
+If you're interested in making proxies for TCGs, try using a [plugin]({{% ref "../plugins" %}}). Currently, we have support for [Magic: The Gathering]({{% ref "../plugins/mtg.md" %}}), [Yu-Gi-Oh!]({{% ref "../plugins/yugioh.md" %}}), and [Lorcana]({{% ref "../plugins/lorcana.md" %}}). All you need to do is provide a decklist and the plugin will automatically fetch the images for you!
 
-Thanks for reading and best of luck with your card cutting adventures!
+Thanks for reading and have fun cutting cards!

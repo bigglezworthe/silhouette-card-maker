@@ -17,7 +17,7 @@ If I had to say anything, I would say this combination is only marginally thicke
 
 Yes, the `create_pdf.py` script has many other features including laying out double-sided cards. To see the full documentation, please see [here]({{% ref "../docs/create.md#double-sided-cards" %}}).
 
-Long story short, put the fronts in the `game/front/` folder and the backs in the `game/double_sided/` folder. The names of the files must match for each pair. Then, simply run `create_pdf.py` as usual.
+Long story short, put the fronts in the `game/front/` folder and the backs in the `game/double_sided/` folder. The filenames (and file extensions) must match for each pair. Then, simply run `create_pdf.py` as usual.
 
 ## Do you have printer recommendations?
 

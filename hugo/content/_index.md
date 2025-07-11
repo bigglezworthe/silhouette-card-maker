@@ -45,11 +45,11 @@ This project supports the following card and paper sizes, with more in the futur
 
 | Paper size | `standard`* | `japanese`** | `poker` | `poker_half` | `bridge` | `domino` | `square_half` |
 | ---------- | ----------- | ------------ | ------- | ------------ | -------- | -------- | ------------- |
-| `letter`   | ✅         | ✅           | ✅     |  ✅          | ✅      | ✅       | ✅           |
-| `tabloid`  | ✅         | ❌           | ❌     |  ❌          | ❌      | ❌       | ❌           |
-| `a4`       | ✅         | ✅           | ✅     |  ✅          | ✅      | ❌       | ❌           |
-| `a3`       | ✅         | ❌           | ❌     |  ❌          | ❌      | ❌       | ❌           |
-| `archb`    | ✅         | ❌           | ❌     |  ❌          | ❌      | ❌       | ❌           |
+| `letter`   | ✅          | ✅           | ✅      |  ✅          | ✅       | ✅       | ✅            |
+| `tabloid`  | ✅          | ❌           | ❌      |  ❌          | ❌       | ❌       | ❌            |
+| `a4`       | ✅          | ✅           | ✅      |  ✅          | ✅       | ❌       | ❌            |
+| `a3`       | ✅          | ❌           | ❌      |  ❌          | ❌       | ❌       | ❌            |
+| `archb`    | ✅          | ❌           | ❌      |  ❌          | ❌       | ❌       | ❌            |
 
 | Paper size | Inches       | Millimeters   |
 | ---------- | ------------ | ------------- |
@@ -69,6 +69,6 @@ This project supports the following card and paper sizes, with more in the futur
 | `domino`      | **1.75 x 3.5**  | 44.45 x 88.9  |
 | `square_half` | **1.75 x 1.75** | 44.45 x 44.45 |
 
-\* including: Magic the Gathering, Pokémon, Lorcana, One Piece, Digimon, Star Wars: Unlimited, and Flesh and Blood.
+\* including: **Magic the Gathering**, **Pokémon**, **Lorcana**, **One Piece**, **Digimon**, **Star Wars: Unlimited**, and **Flesh and Blood**.
 
-** including: Yu-Gi-Oh!.
+** including: **Yu-Gi-Oh!**.
