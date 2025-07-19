@@ -16,7 +16,10 @@
     [ ] Adopt dot notation for local imports
     [ ] Make proper constants
     [ ] Standalone tools should have CLI interface
+    [ ] Remove `click` dependency by using `kwargs`
+[ ] Create `utils/enums.py` to hold reference enums
 [ ] Create `json` config for common CLI settings
 [ ] Scale down tutorial images by ~50% to save disk space
+
 
 

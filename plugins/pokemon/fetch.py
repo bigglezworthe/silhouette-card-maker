@@ -1,7 +1,7 @@
 import os
 
 import click
-from deck_formats import DeckFormat, parse_deck
+from .deck_formats import DeckFormat, parse_deck
 from ..utils.pdf_image_extractor import extract_pdf
 
 from typing import Set
