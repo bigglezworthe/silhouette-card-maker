@@ -43,13 +43,13 @@ Proxies should be easily identifiable as proxies. You may not use this repo to c
 
 This project supports the following card and paper sizes, with more in the future:
 
-| Paper size | `standard`* | `japanese`** | `poker` | `poker_half` | `bridge` | `domino` | `square_half` |
-| ---------- | ----------- | ------------ | ------- | ------------ | -------- | -------- | ------------- |
-| `letter`   | ✅          | ✅           | ✅      |  ✅          | ✅       | ✅       | ✅            |
-| `tabloid`  | ✅          | ❌           | ❌      |  ❌          | ❌       | ❌       | ❌            |
-| `a4`       | ✅          | ✅           | ✅      |  ✅          | ✅       | ❌       | ❌            |
-| `a3`       | ✅          | ❌           | ❌      |  ❌          | ❌       | ❌       | ❌            |
-| `archb`    | ✅          | ❌           | ❌      |  ❌          | ❌       | ❌       | ❌            |
+| Paper size | `standard`* | `japanese`** | `poker` | `poker_half` | `bridge` | `bridge_square` | `domino` | `domino_square` |
+| ---------- | ----------- | ------------ | ------- | ------------ | -------- | --------------- | -------- | --------------- |
+| `letter`   | ✅          | ✅          | ✅      |  ✅         | ✅       | ✅             | ✅       | ✅             |
+| `tabloid`  | ✅          | ❌          | ❌      |  ❌         | ❌       | ❌             | ❌       | ❌             |
+| `a4`       | ✅          | ✅          | ✅      |  ✅         | ✅       | ❌             | ❌       | ❌             |
+| `a3`       | ✅          | ❌          | ❌      |  ❌         | ❌       | ❌             | ❌       | ❌             |
+| `archb`    | ✅          | ❌          | ❌      |  ❌         | ❌       | ❌             | ❌       | ❌             |
 
 | Paper size | Inches       | Millimeters   |
 | ---------- | ------------ | ------------- |
@@ -59,15 +59,16 @@ This project supports the following card and paper sizes, with more in the futur
 | `a3`       | 11.7 x 16.5  | **297 x 420** |
 | `archb`    | **12 x 18**  | 304.8 x 457.2 |
 
-| Card size     | Inches          | Millimeters   |
-| ------------- | --------------- | ------------- |
-| `standard`*   | 2.48 x 3.46     | **63 x 88**   |
-| `japanese`**  | 2.32 x 3.39     | **59 x 86**   |
-| `poker`       | **2.5 x 3.5**   | 63.5 x 88.9   |
-| `poker_half`  | **1.75 x 2.45** | 44.45 x 62.23 |
-| `bridge`      | **2.25 x 3.5**  | 57.15 x 88.9  |
-| `domino`      | **1.75 x 3.5**  | 44.45 x 88.9  |
-| `square_half` | **1.75 x 1.75** | 44.45 x 44.45 |
+| Card size       | Inches          | Millimeters   |
+| --------------- | --------------- | ------------- |
+| `standard`*     | 2.48 x 3.46     | **63 x 88**   |
+| `japanese`**    | 2.32 x 3.39     | **59 x 86**   |
+| `poker`         | **2.5 x 3.5**   | 63.5 x 88.9   |
+| `poker_half`    | **1.75 x 2.45** | 44.45 x 62.23 |
+| `bridge`        | **2.25 x 3.5**  | 57.15 x 88.9  |
+| `bridge_square` | **2.25 x 2.25** | 57.15 x 57.15 |
+| `domino`        | **1.75 x 3.5**  | 44.45 x 88.9  |
+| `domino_square` | **1.75 x 1.75** | 44.45 x 44.45 |
 
 \* including: **Magic the Gathering**, **Pokémon**, **Lorcana**, **One Piece**, **Digimon**, **Star Wars: Unlimited**, and **Flesh and Blood**.
 

@@ -1,8 +1,8 @@
 # Back Directory
 
-This directory should contain your card back image.
+This directory should contain your card back image(s).
 
-If no image are provided, `create_pdf.py` will provide a blank back.
+If no image is provided, `create_pdf.py` will use a blank back.
 
 The image should be in portrait orientation and cropped.
 

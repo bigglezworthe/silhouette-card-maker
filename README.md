@@ -36,13 +36,13 @@ Proxies should be easily identifiable as proxies. You may not use this repo to c
 
 This project supports the following card and paper sizes, with more in the future:
 
-| Paper size | `standard`* | `japanese`** | `poker` | `poker_half` | `bridge` | `domino` | `square_half` |
-| ---------- | ----------- | ------------ | ------- | ------------ | -------- | -------- | ------------- |
-| `letter`   | ✅          | ✅           | ✅      |  ✅          | ✅       | ✅       | ✅            |
-| `tabloid`  | ✅          | ❌           | ❌      |  ❌          | ❌       | ❌       | ❌            |
-| `a4`       | ✅          | ✅           | ✅      |  ✅          | ✅       | ❌       | ❌            |
-| `a3`       | ✅          | ❌           | ❌      |  ❌          | ❌       | ❌       | ❌            |
-| `archb`    | ✅          | ❌           | ❌      |  ❌          | ❌       | ❌       | ❌            |
+| Paper size | `standard`* | `japanese`** | `poker` | `poker_half` | `bridge` | `bridge_square` | `domino` | `domino_square` |
+| ---------- | ----------- | ------------ | ------- | ------------ | -------- | --------------- | -------- | --------------- |
+| `letter`   | ✅          | ✅          | ✅      |  ✅         | ✅       | ✅             | ✅       | ✅             |
+| `tabloid`  | ✅          | ❌          | ❌      |  ❌         | ❌       | ❌             | ❌       | ❌             |
+| `a4`       | ✅          | ✅          | ✅      |  ✅         | ✅       | ❌             | ❌       | ❌             |
+| `a3`       | ✅          | ❌          | ❌      |  ❌         | ❌       | ❌             | ❌       | ❌             |
+| `archb`    | ✅          | ❌          | ❌      |  ❌         | ❌       | ❌             | ❌       | ❌             |
 
 | Paper size | Inches       | Millimeters   |
 | ---------- | ------------ | ------------- |
@@ -52,15 +52,16 @@ This project supports the following card and paper sizes, with more in the futur
 | `a3`       | 11.7 x 16.5  | **297 x 420** |
 | `archb`    | **12 x 18**  | 304.8 x 457.2 |
 
-| Card size     | Inches          | Millimeters   |
-| ------------- | --------------- | ------------- |
-| `standard`*   | 2.48 x 3.46     | **63 x 88**   |
-| `japanese`**  | 2.32 x 3.39     | **59 x 86**   |
-| `poker`       | **2.5 x 3.5**   | 63.5 x 88.9   |
-| `poker_half`  | **1.75 x 2.45** | 44.45 x 62.23 |
-| `bridge`      | **2.25 x 3.5**  | 57.15 x 88.9  |
-| `domino`      | **1.75 x 3.5**  | 44.45 x 88.9  |
-| `square_half` | **1.75 x 1.75** | 44.45 x 44.45 |
+| Card size       | Inches          | Millimeters   |
+| --------------- | --------------- | ------------- |
+| `standard`*     | 2.48 x 3.46     | **63 x 88**   |
+| `japanese`**    | 2.32 x 3.39     | **59 x 86**   |
+| `poker`         | **2.5 x 3.5**   | 63.5 x 88.9   |
+| `poker_half`    | **1.75 x 2.45** | 44.45 x 62.23 |
+| `bridge`        | **2.25 x 3.5**  | 57.15 x 88.9  |
+| `bridge_square` | **2.25 x 2.25** | 57.15 x 57.15 |
+| `domino`        | **1.75 x 3.5**  | 44.45 x 88.9  |
+| `domino_square` | **1.75 x 1.75** | 44.45 x 44.45 |
 
 \* including: **Magic the Gathering**, **Pokémon**, **Lorcana**, **One Piece**, **Digimon**, **Star Wars: Unlimited**, and **Flesh and Blood**.
 
@@ -142,22 +143,21 @@ Options:
   --front_dir_path TEXT           The path to the directory containing the
                                   card fronts.  [default: game/front]
   --back_dir_path TEXT            The path to the directory containing one or
-                                  no card backs.  [default: game/back]
+                                  more card backs.  [default: game/back]
   --double_sided_dir_path TEXT    The path to the directory containing card
                                   backs for double-sided cards.  [default:
                                   game/double_sided]
   --output_path TEXT              The desired path to the output PDF.
                                   [default: game/output/game.pdf]
   --output_images                 Create images instead of a PDF.
-  --card_size [standard|japanese|poker|poker_half|bridge|domino|square_half]
+  --card_size [standard|japanese|poker|poker_half|bridge|bridge_square|domino|domino_square]
                                   The desired card size.  [default: standard]
   --paper_size [letter|tabloid|a4|a3|archb]
                                   The desired paper size.  [default: letter]
   --only_fronts                   Only use the card fronts, exclude the card
                                   backs.
-  --crop FLOAT RANGE              Crop a percentage of the outer portion of
-                                  front and double-sided images, useful for
-                                  existing print bleed.  [0<=x<=100]
+  --crop TEXT                     Crop the outer portion of front and double-
+                                  sided images. Examples: 3mm, 0.125in, 6.5.
   --extend_corners INTEGER RANGE  Reduce artifacts produced by rounded corners
                                   in card images.  [default: 0; x>=0]
   --ppi INTEGER RANGE             Pixels per inch (PPI) when creating PDF.
@@ -179,10 +179,10 @@ Create poker-sized cards with A4 sized paper.
 python create_pdf.py --card_size poker --paper_size a4
 ```
 
-Crop the borders of the front and double-sided images. This option is useful if your images already have print bleed.
+Crop the borders of the front and double-sided images by 3 mm on all sides. This option is useful if your images already have print bleed.
 
 ```sh
-python create_pdf.py --crop 6.5
+python create_pdf.py --crop 3mm
 ```
 
 Remove the [rounded corners](#corner-artifacts) from the PDF and load the saved offset from [`offset_pdf.py`](#offset_pdfpy).

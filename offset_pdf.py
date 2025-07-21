@@ -40,24 +40,27 @@ def offset_pdf(pdf_path, output_pdf_path, x_offset, y_offset, save, ppi):
         save_offset(new_x_offset, new_y_offset)
         print(f'Saved offset')
 
-    pdf = pdfium.PdfDocument(pdf_path)
+    try:
+        pdf = pdfium.PdfDocument(pdf_path)
 
-    # Get all the raw page images from the PDF
-    raw_images = []
-    for page_number in range(len(pdf)):
-        print(f"Page {page_number + 1}")
-        page = pdf.get_page(page_number)
-        raw_images.append(page.render(ppi/72).to_pil())
+        # Get all the raw page images from the PDF
+        raw_images = []
+        for page_number in range(len(pdf)):
+            print(f"Page {page_number + 1}")
+            page = pdf.get_page(page_number)
+            raw_images.append(page.render(ppi/72).to_pil())
 
-    # Offset images
-    final_images = offset_images(raw_images, new_x_offset, new_y_offset, ppi)
+        # Offset images
+        final_images = offset_images(raw_images, new_x_offset, new_y_offset, ppi)
 
-    # The default for output_pdf_path is the original path but with _offset.py appended to the end.
-    if output_pdf_path is None:
-        output_pdf_path = f'{pdf_path.removesuffix(".pdf")}_offset.pdf'
+        # The default for output_pdf_path is the original path but with _offset.py appended to the end.
+        if output_pdf_path is None:
+            output_pdf_path = f'{pdf_path.removesuffix(".pdf")}_offset.pdf'
 
-    final_images[0].save(output_pdf_path, save_all=True, append_images=final_images[1:], resolution=ppi, speed=0, subsampling=0, quality=100)
-    print(f'Offset PDF: {output_pdf_path}')
+        final_images[0].save(output_pdf_path, save_all=True, append_images=final_images[1:], resolution=ppi, speed=0, subsampling=0, quality=100)
+        print(f'Offset PDF: {output_pdf_path}')
+    except FileNotFoundError as e:
+        print(f"Cannot offset nonexistent PDF: {e}")
 
 if __name__ == '__main__':
     offset_pdf()

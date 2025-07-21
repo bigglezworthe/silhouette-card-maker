@@ -4,11 +4,12 @@ import json
 import math
 import os
 from pathlib import Path
+import re
 from typing import Dict, List
 from xml.dom import ValidationErr
 
 from natsort import natsorted
-from PIL import Image, ImageChops, ImageDraw, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageFont, ImageOps
 from pydantic import BaseModel
 
 # Specify directory locations
@@ -23,8 +24,9 @@ class CardSize(str, Enum):
     POKER = "poker"
     POKER_HALF = "poker_half"
     BRIDGE = "bridge"
+    BRIDGE_SQUARE = "bridge_square"
     DOMINO = "domino"
-    SQUARE_HALF = "square_half"
+    DOMINO_SQUARE = "domino_square"
 
 class PaperSize(str, Enum):
     LETTER = "letter"
@@ -56,6 +58,51 @@ EXTRANEOUS_FILES = {
     "Icon\r",  # macOS oddball
 }
 
+def parse_crop_string(crop_string: str | None, card_width: int, card_height: int, ppi: int) -> tuple[float, float]:
+    """
+    Calculates crop based on various formats.
+
+    "9" -> (9, 9)
+    "3mm" -> calls function to determine mm crop
+    "3in" -> calls function to determine in crop
+    """
+    if crop_string is None:
+        return 0, 0
+
+    crop_string = crop_string.strip().lower()
+
+    float_pattern = r"(?:\d+\.\d*|\.\d+|\d+)"  # matches 1.0, .5, or 2
+
+    # Match "3mm" or "3.5mm"
+    mm_match = re.fullmatch(rf"({float_pattern})mm", crop_string)
+    if mm_match:
+        crop_mm = float(mm_match.group(1))
+        return convertInToCrop(crop_mm / 25.4, card_width, card_height, ppi)
+
+    # Match "0.1in" or "0.125in"
+    in_match = re.fullmatch(rf"({float_pattern})in", crop_string)
+    if in_match:
+        crop_in = float(in_match.group(1))
+        return convertInToCrop(crop_in, card_width, card_height, ppi)
+
+    # Match single float like "6.5" or "4.5"
+    single_match = re.fullmatch(float_pattern, crop_string)
+    if single_match:
+        num = float(crop_string)
+        return num, num
+
+    raise ValueError(f"Invalid crop format: '{crop_string}'")
+
+def convertInToCrop(crop_in: float, card_width_px: int, card_height_px: int, ppi: int) -> tuple[float, float]:
+    # Convert from pixels to physical mm using DPI
+    card_width_mm = card_width_px / ppi
+    card_height_mm = card_height_px / ppi
+
+    crop_x_percent = 2 * crop_in / card_width_mm * 100
+    crop_y_percent = 2 * crop_in / card_height_mm * 100
+
+    return (crop_x_percent, crop_y_percent)
+
 def delete_hidden_files_in_directory(path: str):
     if len(path) > 0:
         for file in os.listdir(path):
@@ -72,7 +119,7 @@ def get_directory(path):
         return os.path.abspath(path)
     else:
         return os.path.abspath(os.path.dirname(path))
-    
+
 def get_image_file_paths(dir_path: str) -> List[str]:
     result = []
 
@@ -93,28 +140,27 @@ def get_back_card_image_path(back_dir_path) -> str | None:
     # The directory may contain markdown files
     files = [f for f in os.listdir(back_dir_path) if (os.path.isfile(os.path.join(back_dir_path, f)) and not f.endswith(".md"))]
 
-
     if len(files) == 0:
         return None
-    
+
     if len(files) == 1:
         return os.path.join(back_dir_path, files[0])
 
+    # Multiple back files detected, provide a selection menu
     for i, f in enumerate(files):
-        print(f'[{i+1}] {f}')
+        print(f'[{i + 1}] {f}')
 
     while True:
-        choice = input("Enter the number of the file to use as the back image: ")
+        choice = input("Select a back image (enter the number): ")
+
         if not choice.isdigit():
             continue
 
-        choice = int(choice)-1
-        if choice < len(files) and choice >= 0: 
+        index = int(choice) - 1
+        if index >= 0 and index < len(files):
             break
 
-    return os.path.join(back_dir_path,files[choice])
-
-        #raise Exception(f'Back image directory path "{back_dir_path}" contains more than one image. Files include "{files}".')
+    return os.path.join(back_dir_path, files[index])
 
 def draw_card_with_bleed(card_image: Image, base_image: Image, box: tuple[int, int, int, int], print_bleed: tuple[int, int]):
     origin_x, origin_y, _, _ = box
@@ -156,7 +202,7 @@ def draw_card_with_bleed(card_image: Image, base_image: Image, box: tuple[int, i
 
     return base_image
 
-def draw_card_layout(card_images: List[Image.Image], base_image: Image.Image, num_rows: int, num_cols: int, x_pos: List[int], y_pos: List[int], width: int, height: int, print_bleed: tuple[int, int], crop: float, ppi_ratio: float, extend_corners: int, flip: bool):
+def draw_card_layout(card_images: List[Image.Image], base_image: Image.Image, num_rows: int, num_cols: int, x_pos: List[int], y_pos: List[int], width: int, height: int, print_bleed: tuple[int, int], crop: tuple[float, float], ppi_ratio: float, extend_corners: int, flip: bool):
     num_cards = num_rows * num_cols
 
     # Fill all the spaces with the card back
@@ -173,11 +219,18 @@ def draw_card_layout(card_images: List[Image.Image], base_image: Image.Image, nu
             card_image = card_image.rotate(180)
 
         # Crop the outer portion of a card to remove preexisting print bleed
-        if crop > 0:
+        crop_x_percent, crop_y_percent = crop
+        if crop_x_percent > 0 or crop_y_percent > 0:
             card_width, card_height = card_image.size
-            card_width_crop = math.floor(card_width / 2 * (crop / 100))
-            card_height_crop = math.floor(card_height / 2 * (crop / 100))
-            card_image = card_image.crop((card_width_crop, card_height_crop, card_width - card_width_crop, card_height - card_height_crop))
+            card_width_crop = math.floor(card_width / 2 * (crop_x_percent / 100))
+            card_height_crop = math.floor(card_height / 2 * (crop_y_percent / 100))
+
+            card_image = card_image.crop((
+                card_width_crop,
+                card_height_crop,
+                card_width - card_width_crop,
+                card_height - card_height_crop
+            ))
 
         # Resize the image to normalize extend_corners
         card_image = card_image.resize((math.floor(width * ppi_ratio), math.floor(height * ppi_ratio)))
@@ -222,7 +275,7 @@ def generate_pdf(
     card_size: CardSize,
     paper_size: PaperSize,
     only_fronts: bool,
-    crop: float,
+    crop_string: str | None,
     extend_corners: int,
     ppi: int,
     quality: int,
@@ -253,11 +306,13 @@ def generate_pdf(
             raise Exception(f'Cannot save PDF to output path "{output_path}" because it is not a valid PDF file path.')
 
     # Get the back image, if it exists
-    use_default_back_page = False
-    back_card_image_path = get_back_card_image_path(back_dir_path)
-    if back_card_image_path is None:
-        use_default_back_page = True
-        print(f'No back image provided in back image directory "{back_dir_path}". Using default instead.')
+    back_card_image_path = None
+    use_default_back_page = True
+    if not only_fronts:
+        back_card_image_path = get_back_card_image_path(back_dir_path)
+        use_default_back_page = back_card_image_path is None
+        if use_default_back_page:
+            print(f'No back image provided in back image directory \"{back_dir_path}\". Using default instead.')
 
     front_image_filenames = get_image_file_paths(front_dir_path)
     ds_image_filenames = get_image_file_paths(double_sided_dir_path)
@@ -292,12 +347,11 @@ def generate_pdf(
             raise Exception(f'Unsupported card size "{card_size}" with paper size "{paper_size}". Try card sizes: {paper_layout.card_layouts.keys()}.')
         card_layout = paper_layout.card_layouts[card_size_enum]
 
+        crop = parse_crop_string(crop_string, card_layout.width, card_layout.height, ppi)
+
         num_rows = len(card_layout.y_pos)
         num_cols = len(card_layout.x_pos)
         num_cards = num_rows * num_cols
-
-        blank_filename = f'{paper_size}_blank.jpg'
-        blank_path = os.path.join(asset_directory, blank_filename)
 
         registration_filename =  f'{paper_size}_registration.jpg'
         registration_path = os.path.join(asset_directory, registration_filename)
@@ -320,6 +374,8 @@ def generate_pdf(
 
                 # Load the card back image
                 with Image.open(back_card_image_path) as back_im:
+                    back_im = ImageOps.exif_transpose(back_im)
+
                     draw_card_layout(
                         [back_im] * num_cards,
                         single_sided_back_page,
@@ -330,7 +386,7 @@ def generate_pdf(
                         card_layout.width,
                         card_layout.height,
                         max_print_bleed,
-                        0,
+                        (0, 0),
                         ppi_ratio,
                         extend_corners,
                         flip=True
@@ -351,7 +407,9 @@ def generate_pdf(
                     num_image = num_image + 1
 
                     front_image_path = os.path.join(front_dir_path, file)
-                    front_card_images.append(Image.open(front_image_path))
+                    front_image = Image.open(front_image_path)
+                    front_image = ImageOps.exif_transpose(front_image)
+                    front_card_images.append(front_image)
 
                 single_sided_front_page = reg_im.copy()
 
@@ -383,6 +441,7 @@ def generate_pdf(
                     only_fronts,
                     name
                 )
+
             # Create double-sided card layout
             it = iter(natsorted(list(ds_set)))
             while True:
@@ -398,10 +457,14 @@ def generate_pdf(
                     num_image = num_image + 1
 
                     front_image_path = os.path.join(front_dir_path, file)
-                    front_card_images.append(Image.open(front_image_path))
+                    front_image = Image.open(front_image_path)
+                    front_image = ImageOps.exif_transpose(front_image)
+                    front_card_images.append(front_image)
 
-                    back_image_path = os.path.join(double_sided_dir_path, file)
-                    back_card_images.append(Image.open(back_image_path))
+                    ds_image_path = os.path.join(double_sided_dir_path, file)
+                    ds_image = Image.open(ds_image_path)
+                    ds_image = ImageOps.exif_transpose(ds_image)
+                    back_card_images.append(ds_image)
 
                 double_sided_front_page = reg_im.copy()
                 double_sided_back_page = reg_im.copy()

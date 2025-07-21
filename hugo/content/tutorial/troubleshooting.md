@@ -73,7 +73,13 @@ Make sure you're using the right cutting template. Each sheet should be labeled 
 
 ## Why did my cards come out diagonally?
 
+Make sure your machine's pinch rollers are set to the right position. The pinch rollers should grip both sides of the mat.
+
 Registration can fail or be adversely affected when the machine scans something other than the registration marks. As described in [Why is the registration failing?](#why-is-the-registration-failing), employ the Post-It trick.
+
+## Why is the mat slipping during cutting?
+
+Your machine uses two pinch rollers to grip the mat. Check if that is the case. If not, adjust their positions so they do.
 
 ## Why are my cards offset?
 

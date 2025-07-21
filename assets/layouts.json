@@ -81,6 +81,22 @@
                     ],
                     "template": "letter_bridge_v2"
                 },
+                "bridge_square": {
+                    "width": 673,
+                    "height": 673,
+                    "x_pos": [
+                        242,
+                        956,
+                        1670,
+                        2384
+                    ],
+                    "y_pos": [
+                        221,
+                        938,
+                        1654
+                    ],
+                    "template": "letter_bridgesquare_v1"
+                },
                 "domino": {
                     "width": 524,
                     "height": 1049,
@@ -97,7 +113,7 @@
                     ],
                     "template": "letter_domino_v1"
                 },
-                "square_half": {
+                "domino_square": {
                     "width": 524,
                     "height": 524,
                     "x_pos": [
@@ -113,7 +129,7 @@
                         1295,
                         1859
                     ],
-                    "template": "letter_squarehalf_v1"
+                    "template": "letter_dominosquare_v1"
                 }
             }
         },
@@ -138,6 +154,40 @@
 
                     ],
                     "template": "tabloid_standard_v1"
+                },
+                "poker": {
+                    "width": 748,
+                    "height": 1049,
+                    "x_pos": [
+                        131,
+                        894,
+                        1656,
+                        2419
+                    ],
+                    "y_pos": [
+                        432,
+                        1494,
+                        2557,
+                        3619
+                    ],
+                    "template": "tabloid_poker_v1"
+                },
+                "bridge": {
+                    "width": 673,
+                    "height": 1049,
+                    "x_pos": [
+                        255,
+                        960,
+                        1665,
+                        2370
+                    ],
+                    "y_pos": [
+                        416,
+                        1489,
+                        2562,
+                        3635
+                    ],
+                    "template": "tabloid_bridge_v1"
                 }
             }
         },

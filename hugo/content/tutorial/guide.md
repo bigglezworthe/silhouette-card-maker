@@ -166,6 +166,8 @@ Use a Post-It note to **cover the bottom left card**. Because the card is so clo
 
 ![Post-It note](/images/registration_fix.jpg)
 
+The machine's pinch rollers grip and move the mat. Ensure that they are set to the right position for your mat. The should grip both sides of your mat.
+
 Insert the mat into the machine. The left edge of the mat should be aligned with the notch on the machine. Then, click the media load button on the machine.
 
 ![Mat alignment](/images/mat_alignment.jpg)
