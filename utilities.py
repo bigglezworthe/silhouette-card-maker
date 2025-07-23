@@ -8,6 +8,7 @@ import re
 from typing import Dict, List
 from xml.dom import ValidationErr
 
+
 from natsort import natsorted
 from PIL import Image, ImageChops, ImageDraw, ImageFont, ImageOps
 from pydantic import BaseModel
@@ -17,6 +18,15 @@ asset_directory = 'assets'
 
 layouts_filename = 'layouts.json'
 layouts_path = os.path.join(asset_directory, layouts_filename)
+
+class Paths():
+    BASE = Path()
+    GAME = BASE / 'game'
+    FRONT = GAME / 'front'
+    BACK = GAME / 'back'
+    DOUBLE = GAME / 'double_sided'
+    OUTPUT = GAME / 'output'
+    ASSETS = BASE / 'assets'
 
 class CardSize(str, Enum):
     STANDARD = "standard"
@@ -66,6 +76,7 @@ def parse_crop_string(crop_string: str | None, card_width: int, card_height: int
     "3mm" -> calls function to determine mm crop
     "3in" -> calls function to determine in crop
     """
+
     if crop_string is None:
         return 0, 0
 
@@ -103,6 +114,7 @@ def convertInToCrop(crop_in: float, card_width_px: int, card_height_px: int, ppi
 
     return (crop_x_percent, crop_y_percent)
 
+# Probably not necessary
 def delete_hidden_files_in_directory(path: str):
     if len(path) > 0:
         for file in os.listdir(path):
@@ -114,6 +126,7 @@ def delete_hidden_files_in_directory(path: str):
                 except OSError as e:
                     print(f"Could not remove {full_path}: {e}")
 
+# Not necessary
 def get_directory(path):
     if os.path.isdir(path):
         return os.path.abspath(path)
@@ -267,10 +280,10 @@ def add_front_back_pages(front_page: Image.Image, back_page: Image.Image, pages:
         pages.append(back_page)
 
 def generate_pdf(
-    front_dir_path: str,
-    back_dir_path: str,
-    double_sided_dir_path: str,
-    output_path: str,
+    front_dir_path: Path,
+    back_dir_path: Path,
+    double_sided_dir_path: Path,
+    output_path: Path,
     output_images: bool,
     card_size: CardSize,
     paper_size: PaperSize,
@@ -282,28 +295,10 @@ def generate_pdf(
     load_offset: bool,
     name: str
 ):
-    f_path = Path(front_dir_path)
-    if not f_path.exists() or not f_path.is_dir():
-        raise Exception(f'Front image directory path "{f_path}" is invalid.')
 
-    b_path = Path(back_dir_path)
-    if not b_path.exists() or not b_path.is_dir():
-        raise Exception(f'Back image directory path "{b_path}" is invalid.')
-
-    d_path = Path(double_sided_dir_path)
-    if not d_path.exists() or not d_path.is_dir():
-        raise Exception(f'Double-sided image directory path "{d_path}" is invalid.')
-
-    delete_hidden_files_in_directory(front_dir_path)
-    delete_hidden_files_in_directory(back_dir_path)
-    delete_hidden_files_in_directory(double_sided_dir_path)
-
-    # Sanity check for output images
-    if output_images:
-        output_path = get_directory(output_path)
-    else:
-        if not output_path.lower().endswith(".pdf"):
-            raise Exception(f'Cannot save PDF to output path "{output_path}" because it is not a valid PDF file path.')
+    # delete_hidden_files_in_directory(front_dir_path)
+    # delete_hidden_files_in_directory(back_dir_path)
+    # delete_hidden_files_in_directory(double_sided_dir_path)
 
     # Get the back image, if it exists
     back_card_image_path = None
