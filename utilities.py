@@ -13,13 +13,8 @@ from natsort import natsorted
 from PIL import Image, ImageChops, ImageDraw, ImageFont, ImageOps
 from pydantic import BaseModel
 
-# Specify directory locations
-asset_directory = 'assets'
-
-layouts_filename = 'layouts.json'
-layouts_path = os.path.join(asset_directory, layouts_filename)
-
 IMAGE_TYPES = [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".webp", ".avif"]
+
 
 class Paths():
     BASE = Path()
@@ -61,8 +56,9 @@ class PaperLayout(BaseModel):
 
 class Layouts(BaseModel):
     paper_layouts: Dict[PaperSize, PaperLayout]
-
-class Card(BaseModel):
+    
+class CardImage():
+    name: str
     front: Image.Image
     back: Image.Image
 
@@ -93,10 +89,98 @@ def get_directory(path):
     else:
         return os.path.abspath(os.path.dirname(path))
 
-def get_image_paths(path:Path) -> [Path]:
-    return [f for f in path.rglob("*") if f.suffix in IMAGE_TYPES and f.is_file()]
+
+
+#=================================================================
+# GET CARD IMAGES
+#-----------------------------------------------------------------
+
+def get_image_paths(path:Path, query='*', recursive:bool=True) -> [Path]:
+    # Recursively gets all images 
+    if recursive:
+        paths = [f for f in path.rglob(query) if f.suffix in IMAGE_TYPES and f.is_file()]
+    else:
+        paths = [f for f in path.glob(query) if f.suffix in IMAGE_TYPES and f.is_file()]
+    return paths
+
+def select_item(items:[], header:str=None):
+    if len(items) == 0:
+        return None
+    elif len(items) == 1:
+        return items[0]
+
+    print(header)
+    for i, item in enumerate(items):
+        print(f'[{i + 1}] {item}')
+
+    while True:
+        choice = input("Select #: ")
+
+        if not choice.isdigit():
+            continue
+
+        index = int(choice) - 1
+        if index >= 0 and index < len(items):
+            return items[index]
+
+def search_back_image(rel_card_dir:Path, back_path:Path)->Path:
+    back_card_dir = back_path / rel_card_dir 
+    image_select_header = f'Back Images available for {rel_card_dir}'
+
+    while True:
+        back_card_path = select_item(get_image_paths(back_card_dir,'*',False),image_select_header)
+        if back_card_path:
+            return back_card_path
+        
+        if back_card_dir == back_path:
+            return None
+
+        back_card_dir = back_card_dir.parent
+
+def search_double_image(rel_card_path:Path, double_path:Path)->Path:
+    double_card_path = double_path / rel_card_path
+
+    if double_card_path.is_file():
+        return double_card_path
+    else:
+        return None
+
+def get_cards(image_paths) -> [CardImage]:
+    card_front_paths = get_image_paths(image_paths['front'],'*',True)
+    card_back_images = {}
+    cards = [CardImage() for _ in range(len(card_front_paths))]
+
+    for i, card in enumerate(cards):
+        card_front_path = card_front_paths[i]
+        rel_card_path = card_front_path.relative_to(image_paths['front'])
+        cards[i].name = rel_card_path.stem
+        cards[i].front = card_front_path
+
+        if len(image_paths)==1:
+            continue
+
+        card_double_image = search_double_image(rel_card_path, image_paths['double'])
+        if card_double_image is not None:
+            cards[i].back = card_double_image
+            continue
+        
+        rel_card_dir = rel_card_path.parent
+        if rel_card_dir in card_back_images:
+            cards[i].back = card_back_images[rel_card_dir]
+            continue
+        
+        card_back_image = search_back_image(rel_card_dir, image_paths['back'])
+        card_back_images[rel_card_dir] = card_back_image
+        cards[i].back = card_back_image
+    
+    return cards
+        
+#-----------------------------------------------------------------
+
+
 
 def get_image_file_paths(dir_path: str) -> List[str]:
+    # Get rid of this
     result = []
 
     for current_folder, _, files in os.walk(dir_path):
@@ -288,6 +372,7 @@ def generate_pdf(
         if len(ds_set) > 0:
             raise Exception(f'Cannot use "--only_fronts" with double-sided cards. Remove cards from double-side image directory "{double_sided_dir_path}".')
 
+    layouts_path = Paths.ASSETS / 'layouts.json'
     with open(layouts_path, 'r') as layouts_file:
         try:
             layouts_data = json.load(layouts_file)

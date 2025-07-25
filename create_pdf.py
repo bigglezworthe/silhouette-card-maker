@@ -7,7 +7,7 @@ from pathlib import Path
 import click
 import fitz
 
-from utilities import Paths, CardSize, PaperSize, generate_pdf
+from utilities import Paths, CardSize, PaperSize, generate_pdf, get_cards
 
 DEFAULT_OUTPUT_FILE = Paths.OUTPUT / 'game.pdf'
 
@@ -44,33 +44,23 @@ def cli(
     name
 ):
 
-    front_dir_path = Path(front_dir_path)
-    back_dir_path = Path(back_dir_path)
-    double_sided_dir_path = Path(double_sided_dir_path)
+    image_paths = {}
+    image_paths['front'] = Path(front_dir_path)
+    image_paths['back'] = Path(back_dir_path)
+    image_paths['double'] = Path(double_sided_dir_path)
     output_path = Path(output_path)
 
-    # Will probably separate this out into its own function eventually
-    # Why not just make the directory if it doesn't exist?
+    crop = crop.strip().lower()
 
-    def require_dir(path:Path, name:str="path"):
-        if not path.is_dir():
-            raise FileNotFoundError(f' {name} path {path} is invalid.')
-    
-    def require_ext(path:Path, ext:str, name:str="file"):
-        if path.suffix != 'pdf':
-            raise ValueError(f'{name} file type expect {ext}. Got {path}')
-
-    require_dir(front_dir_path, "Front image")
-    require_dir(back_dir_path, "Back image")
-    require_dir(double_sided_dir_path, "Double-sided image")
-
-    if output_images:
-        require_dir(output_path, "Output")
-    else:
-        require_ext(output_path, '.pdf', "Output")
-
-    
-
+    cards = get_cards(image_paths)
+    num_digits = len(str(len(cards)-1))
+    for i, card in enumerate(cards):
+        print(f"[{i:0{num_digits}}] {card.name}")
+        print(f'    front: {card.front}')
+        print(f'    back: {card.back}')
+        #card.front.save(output_path / f'{card.name}.{card.front.format}')
+        #card.back.save(output_path / f'{card.name}_back.{card.back.format}')
+        
 
     # pdf = generate_pdf(
     #     front_dir_path,
@@ -90,8 +80,6 @@ def cli(
     # )
 
     print("Success")
-
-
 
 if __name__ == '__main__':
     cli()
