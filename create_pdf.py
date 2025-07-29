@@ -15,7 +15,7 @@ from utils.misc import print_list
 from utils.card import get_cards
 from utils.layouts import load_layouts, get_layout
 
-VERSION = 'v1.0.5'
+VERSION = 'v1.0.0 | dev'
 DEFAULT_OUTPUT_FILE = Paths.OUTPUT / 'game.pdf'
 
 @click.command()
@@ -54,28 +54,30 @@ def cli(
     name
 ):
 
-    image_paths = {}
-    image_paths['front'] = require_item(front_dir_path, False, f'Front Image Folder not found: {front_dir_path}')
-    image_paths['back'] = require_item(back_dir_path, False, f'Back Image Folder not found: {back_dir_path}')
-    image_paths['double'] = require_item(double_sided_dir_path, False, f'Double-Sided Image Folder not found: {double_sided_dir_path}')
-    
+    #================================================================
+    # Input grooming
+    #----------------------------------------------------------------
+    image_paths = {
+        'front': require_item(front_dir_path, False, f'Front Image Folder not found: {front_dir_path}'),
+        'back': require_item(back_dir_path, False, f'Back Image Folder not found: {back_dir_path}'),
+        'double': require_item(double_sided_dir_path, False, f'Double-Sided Image Folder not found: {double_sided_dir_path}')
+    }
+
     if output_images: 
         output_path = require_item(output_path, False, f'Invalid output path. Must be a folder if using --output_images: {output_path}')
-
+    
     crop = crop.strip().lower()
+    #================================================================
 
+    layout = get_layout(paper_size, card_size, load_layouts())
     cards = get_cards(image_paths, only_fronts)
 
     # print_list(cards.single_sided)
     # print_list(cards.double_sided)
 
-    print(f'Total: {cards.total()}')
-    print(f'Single-Sided: {cards.total(True)}')
-    print(f'Double-Sided: {cards.total(False)}')
-    
-
-    layouts = load_layouts()
-    layout = get_layout(paper_size, card_size, layouts)
+    card_stats = cards.total()  
+    for k, v in cards.total().items():
+        print(f'{k}: {v}')
 
     # pdf = generate_pdf(
     #     cards,

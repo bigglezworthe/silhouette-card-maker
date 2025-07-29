@@ -6,10 +6,11 @@ import fitz   #PyMuPDF
 import math
 
 from pathlib import Path
-from PIL import Image, ImageChops, ImageDraw, ImageFont, ImageOps
+# from PIL import Image, ImageChops, ImageDraw, ImageFont, ImageOps
 
 from utils.enums import Paths
 from utils.misc import px2pt, split_by_values
+from utils.image import process_card_image, get_image
 
 class CardPDF:
     def __init__(self, 
@@ -36,6 +37,7 @@ class CardPDF:
 
         self.pdf = fitz.open()
         self.current_page = None
+        self.current_position = 0
 
         self.width = self.to_scale(width)
         self.height = self.to_scale(height)
@@ -109,9 +111,8 @@ class CardPDF:
     def close(self):
        self. pdf.close()
 
-
 def generate_pdf(
-    cards:[Card],
+    cards:Cards,
     output_path:Path,
     output_images: bool,
     layout: Layout,
@@ -161,6 +162,43 @@ def generate_pdf(
     page = pdf.new_page()
 
     max_card_bleed = calc_max_bleed(layout.card_layout)
+    extend_corners_scale = math.floor(extend_corners*ppi_scale)
+    crop_amount, crop_unit = split_float_unit(crop_string)
+    card_width_scaled = math.floor(layout.card_layout_size.width*ppi_scale)
+    card_height_scaled= math.floor(layout.card_layout_size.height*ppi_scale)
+
+    def process_card_image_wrapper(card_path:Path) -> Image.Image:
+        return process_card_image(
+            card_path,
+            card_width_scaled,
+            card_height_scaled,
+            ppi_scale,
+            crop_amount,
+            crop_unit,
+            max_card_bleed,
+            extend_corners_scale
+        )
+
+    for i, card in enumerate(cards.get(single_sided=True)):
+        card_front_image = process_card_image_wrapper(get_image(card.front))
+
+    
+    cached_images = {}
+    for i, card in enumerate(cards.get(single_sided=False)):
+        card_front_image = process_card_image_wrapper(get_image(card.front))
+        
+        if cached_images[card.back]:
+            card_back_image = cached_images[card.back]
+        else
+            card_back_image = process_card_image_wrapper(get_image(card.back))
+            cached_images[card.back] = card_back_image
+    
+        
+
+
+
+
+
 
     pdf.save(output_path)
     pdf.close()
