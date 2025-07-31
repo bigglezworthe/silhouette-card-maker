@@ -9,6 +9,7 @@ class Paths():
     DOUBLE = GAME / 'double_sided'
     OUTPUT = GAME / 'output'
     ASSETS = BASE / 'assets'
+    DATA = BASE / 'data'
 
 class ImageType(str, Enum):
     JPG = ".jpg"

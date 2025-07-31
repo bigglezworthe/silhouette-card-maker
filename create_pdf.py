@@ -13,7 +13,7 @@ from utils.enums import Paths, CardSize, PaperSize
 from utils.filesys import require_item
 from utils.misc import print_list
 from utils.card import get_cards
-from utils.layouts import load_layouts, get_layout
+from utils.layouts import load_layouts, make_layout
 
 VERSION = 'v1.0.0 | dev'
 DEFAULT_OUTPUT_FILE = Paths.OUTPUT / 'game.pdf'
@@ -67,9 +67,16 @@ def cli(
         output_path = require_item(output_path, False, f'Invalid output path. Must be a folder if using --output_images: {output_path}')
     
     crop = crop.strip().lower()
+    skip = list(skip)
+
     #================================================================
 
-    layout = get_layout(paper_size, card_size, load_layouts())
+    layout = make_layout(paper_size, card_size, load_layouts(), skip)
+    print(f'Skip: {skip}')
+    print(f'CCP: {len(layout.card_pos)}')
+    print(f'Layout Card Positions:')
+    print_list(layout.card_pos)
+
     cards = get_cards(image_paths, only_fronts)
 
     # print_list(cards.single_sided)

@@ -128,16 +128,9 @@ def generate_pdf(
     DEFAULT_PPI = 300
     ppi_scale = ppi / DEFAULT_PPI
     
-    card_row = [px2pt(y) for y in layout.card_layout.y_pos]
-    card_col = [px2pt(x) for x in layout.card_layout.x_pos]
+    card_row = [px2pt(y, ppi) for y in layout.card_layout.y_pos]
+    card_col = [px2pt(x, ppi) for x in layout.card_layout.x_pos]
     cards_per_page = len(card_rows) * len(card_cols)
-    
-    valid_pos, invalid_pos = split_by_value(skip_position, cards_per_page)
-    if invalid_pos:
-        print(f'Ignoring skip indices that are outside range 0-{cards_per_page-1}: {invalid_pos}')
-
-    if len(valid_pos) >= cards_per_page:
-        raise ValueError(f'You cannot skip all cards per page')
 
     bg_path = Paths.ASSETS / f'{layout.paper_size}_registration.jpg'
     bg_pix = fitz.Pixmap(str(bg_path))
@@ -179,19 +172,11 @@ def generate_pdf(
             extend_corners_scale
         )
 
-    for i, card in enumerate(cards.get(single_sided=True)):
+    for i, card in enumerate(cards.single_sided):
         card_front_image = process_card_image_wrapper(get_image(card.front))
 
     
-    cached_images = {}
-    for i, card in enumerate(cards.get(single_sided=False)):
-        card_front_image = process_card_image_wrapper(get_image(card.front))
-        
-        if cached_images[card.back]:
-            card_back_image = cached_images[card.back]
-        else
-            card_back_image = process_card_image_wrapper(get_image(card.back))
-            cached_images[card.back] = card_back_image
+    
     
         
 

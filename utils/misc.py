@@ -27,9 +27,13 @@ def print_list(list:list):
     for i, item in enumerate(list):
         print(f'[{i:0{num_digits}}] {item}')
 
+def print_dict(dict:dict):
+    for k, v in dict.items():
+        print(f'{k}: {v}')
+
 def px2pt(px:int, ppi:int)->float:
-    INCH_TO_PT = 72
-    return px / ppi * INCH_TO_PT
+    POINT_PER_INCH = 72
+    return px / ppi * POINT_PER_INCH
 
 def split_float_unit(s:str) -> tuple[float,str]:
     s = s.strip().lower()
@@ -46,8 +50,8 @@ def split_float_unit(s:str) -> tuple[float,str]:
     return num, unit
 
 def split_by_value(l:list[int], n:int) -> tuple[list[int], list[int]]:
-    meet = [x for x in l < n]
-    exceed = [x for x in l >= n]
+    meet = [x for x in l if x < n]
+    exceed = [x for x in l if x >= n]
 
     return meet, exceed
 

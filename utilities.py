@@ -61,42 +61,55 @@ def draw_card_with_bleed(card_image: Image, base_image: Image, box: tuple[int, i
 
     return base_image
 
-def calculate_max_print_bleed(x_pos: List[int], y_pos: List[int], width: int, height: int) -> tuple[int, int]:
-    if len(x_pos) == 1 & len(y_pos) == 1:
-        return (0, 0)
+# def calculate_max_print_bleed(x_pos: List[int], y_pos: List[int], width: int, height: int) -> tuple[int, int]:
+#     if len(x_pos) == 1 & len(y_pos) == 1:
+#         return (0, 0)
 
-    x_border_max = 100000
-    if len(x_pos) >= 2:
-        x_pos.sort()
+#     x_border_max = 100000
+#     if len(x_pos) >= 2:
+#         x_pos.sort()
 
-        x_pos_0 = x_pos[0]
-        x_pos_1 = x_pos[1]
+#         x_pos_0 = x_pos[0]
+#         x_pos_1 = x_pos[1]
 
-        x_border_max = math.ceil((x_pos_1 - x_pos_0 - width) / 2)
+#         x_border_max = math.ceil((x_pos_1 - x_pos_0 - width) / 2)
 
-        if x_border_max < 0:
-            x_border_max = 100000
+#         if x_border_max < 0:
+#             x_border_max = 100000
 
-    y_border_max = 100000
-    if len(y_pos) >= 2:
-        y_pos.sort()
+#     y_border_max = 100000
+#     if len(y_pos) >= 2:
+#         y_pos.sort()
 
-        y_pos_0 = y_pos[0]
-        y_pos_1 = y_pos[1]
+#         y_pos_0 = y_pos[0]
+#         y_pos_1 = y_pos[1]
 
-        y_border_max = math.ceil((y_pos_1 - y_pos_0 - height) / 2)
+#         y_border_max = math.ceil((y_pos_1 - y_pos_0 - height) / 2)
 
-        if y_border_max < 0:
-            y_border_max = 100000
+#         if y_border_max < 0:
+#             y_border_max = 100000
 
-    return (x_border_max, y_border_max)
+#     return (x_border_max, y_border_max)
 #-----------------------------------------------------------------
 
 #=================================================================
 # LAYOUT
 #-----------------------------------------------------------------
 
-def draw_card_layout(card_images: List[Image.Image], base_image: Image.Image, num_rows: int, num_cols: int, x_pos: List[int], y_pos: List[int], width: int, height: int, print_bleed: tuple[int, int], crop: tuple[float, float], ppi_ratio: float, extend_corners: int, flip: bool):
+def draw_card_layout(
+    card_images: List[Image.Image], 
+    base_image: Image.Image, 
+    num_rows: int, 
+    num_cols: int, 
+    x_pos: List[int], 
+    y_pos: List[int], 
+    width: int, 
+    height: int, 
+    print_bleed: tuple[int, int], 
+    crop: tuple[float, float], 
+    ppi_ratio: float, 
+    extend_corners: int, flip: bool):
+    
     num_cards = num_rows * num_cols
 
     # Fill all the spaces with the card back
