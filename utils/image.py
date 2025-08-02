@@ -4,32 +4,12 @@ import re
 from PIL import Image
 
 from utils.misc import split_float_unit
-from utils.card import Card
-
-class CardImage:
-    def __init__(self, front:Image.Image|None, back:Image.Image|None, processed:bool=False):
-        self.front = front
-        self.back = back
-        self.processed = processed
-
-    def open(self,front_path:str|None, back_path:str|None):
-        self.front = Image.open(front_path) if front_path else None
-        self.back = Image.open(back_path) if back_path else None
-    
-    def load(self, front_image:Image.Image|None, back_image:Image.Image|None):
-        self.front = front_image or None
-        self.back = back_iamge or None
-
-    def get(self)->tuple(Image.Image, Image.Image):
-        return self.front, self.back
-
-    def status(self)->str:
-        return f'{"un"*self.processed}processed'.capitalize()
-
+from utils.card import Card, Cards
+from utils.layout import Layout
 
 class CardImageProcessor:
     def __init__(self, 
-            card:CardImage=None,
+            card:Card=None,
             card_width:int,
             card_height:int,
             ppi_scale:float,
@@ -38,11 +18,12 @@ class CardImageProcessor:
             max_card_bleed:tuple[int,int],
             extend_corners:int,
     ):
-        self.card_image = card_image or CardImage()
+        self.card = card
+        self.scale = ppi_scale
+
         self.width = card_width
         self.height = card_height
-        self.scale = ppi_scale
-        self.crop_string = crop_string
+
         self.crop = crop_amount
         self.crop_unit = crop_unit
         self.max_bleed = max_card_bleed
@@ -50,18 +31,23 @@ class CardImageProcessor:
 
         self.errors = []
     
-    def load_card(self,card_image:CardImage):
-        self.card_image = CardImage
+    def load_card(self,card:Card):
+        self.card = card
 
-    def process(self, card_image:CardImage|None)->CardImage:
-        card_image = card_image or self.card_image
-        if not card_image:
+    def process(self, card:Card=None)->Card:
+        card = card or self.card
+        if not card:
             raise ValueError(f'No card supplied')
         
-        card_image.front = self._process_face(card_image.front)
-        card_image.back = self._process_face(card_image.back)
-        card_image.processed = True
-        return card_image
+        if card.front.image:
+            card.front.image = self._process_face(card.front,image)
+            card.front.processed = True
+        if card.back.image:
+            card.back.image = self._process_face(card.back.image)
+            card.back.processed = True
+        
+        self.card = card
+        return card
 
     def _process_face(self, img:Image.Image)->Image.Image:
         cropped = crop_image(img, self.crop_amount, self.crop_unit)
@@ -83,10 +69,10 @@ class CardImageProcessor:
         #     self.errors.append(f'Error: {e}')
 
 def calc_card_bleed(self,card_layout:CardLayout) -> tuple(int,int):
-    x_pos = card.x_pos
-    y_pos = card.y_pos
-    w = card.width
-    h = card.height
+    x_pos = card_layout.x_pos
+    y_pos = card_layout.y_pos
+    w = card_layout.width
+    h = card_layout.height
 
     x_pos.sort()
     y_pos.sort()
@@ -104,7 +90,7 @@ def calc_card_bleed(self,card_layout:CardLayout) -> tuple(int,int):
     
     return (get_max_border(x_pos, width), get_max_border(y_pos, height))
 
-def calc_crop_scale(image_width:int, image_height:int, crop_amount:float, crop_unit:str, ppi:int)->tuple[float,float]: 
+def calc_crop_scale(image_size:tuple[int,int], crop_amount:float, crop_unit:str, ppi:int)->tuple[float,float]: 
     valid_units = [None, '%', 'mm', 'in', 'px']
 
     if crop_unit not in valid_units:
@@ -113,17 +99,19 @@ def calc_crop_scale(image_width:int, image_height:int, crop_amount:float, crop_u
     if crop_amount < 0:
         raise ValueError(f'Crop value cannot be negative. Got {crop_amount}')
 
+    x_percent_px = 2 * crop_amount / image_width
+    y_percent_px = 2 * crop_amount / image_height
+
     match crop_unit:
         case None | '%':
-            x_percent = crop_amount / 100
-            y_percent = crop_amount / 100
+            x_percent = y_percent = crop_amount / 100
         case 'in':
-            x_percent = 2 * crop_amount / image_width * ppi
+            x_percent, y_percent = scale_factor(2 * crop_amount * ppi)
             y_percent = 2 * crop_amount / image_height * ppi
         case 'mm':
-            MM_TO_INCH = 1/25.4
-            x_percent = 2 * crop_amount / image_width * ppi * MM_TO_INCH
-            y_percent = 2 * crop_amount / image_height * ppi * MM_TO_INCH
+            INCH_PER_MM = 1/25.4
+            x_percent = 2 * crop_amount / image_width * ppi * INCH_PER_MM
+            y_percent = 2 * crop_amount / image_height * ppi * INCH_PER_MM
         case 'px':
             x_percent = 2 * crop_amount / image_width
             y_percent = 2 * crop_amount / image_height
@@ -141,7 +129,7 @@ def crop_image(img:Image.Image, crop_amount:float, crop_unit:str|None)->Image.Im
     x, y = img.size
     x_scale, y_scale = calc_crop_scale(x, y, crop_amount, crop_unit, ppi)
 
-    return img.crop((x_crop,y_crop,int(x*x_scale),int(y*y_scale)))
+    return img.crop((x,y,int(x*x_scale),int(y*y_scale)))
 
 def process_card_image(
             card_image:Image.Image,

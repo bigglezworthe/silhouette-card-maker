@@ -31,9 +31,21 @@ def print_dict(dict:dict):
     for k, v in dict.items():
         print(f'{k}: {v}')
 
-def px2pt(px:int, ppi:int)->float:
+def px2pt(px_item, ppi:int):
     POINT_PER_INCH = 72
-    return px / ppi * POINT_PER_INCH
+    match px_item:
+        case int() | float():
+            return px_item / ppi * POINT_PER_INCH
+        case list():
+            return [px2pt(i) for i in px_item]
+        case tuple():
+            return tuple(px2pt(i) for i in px_item)
+        case dict():
+            return {k: px2pt(v) for k, v in px_item.items()}
+        case None:
+            return None
+        case _:
+            raise TypeError(f'Expected int, float, or iterable. Got {isinstance(px_item)}')
 
 def split_float_unit(s:str) -> tuple[float,str]:
     s = s.strip().lower()
