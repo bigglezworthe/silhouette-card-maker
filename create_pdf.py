@@ -73,10 +73,21 @@ def cli(
 
     layout = make_layout(paper_size, card_size, load_layouts(), skip)
     print(f'Skip: {skip}')
-    print(f'CCP: {len(layout.card_pos)}')
+    print(f'CCP: {layout.cards_per_page}')
     print(f'Layout Card Positions:')
-    print_list(layout.card_pos)
+    print_list(layout.card_positions)
+    print(f'CardSize: {layout.card_layout_size}')
+    print(f'PaperSize: {layout.paper_layout}')
 
+    print('Layout scale test: x2')
+    layout.scale(2)
+    print_list(layout.card_positions)
+    print(f'CardSize: {layout.card_layout_size}')
+    print(f'PaperSize: {layout.paper_layout}')
+
+    borders = tuple(min(extend_corners, border) for border in layout.max_border)
+    print(borders)
+    
     cards = get_cards(image_paths, only_fronts)
 
     # print_list(cards.single_sided)
