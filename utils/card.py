@@ -4,30 +4,23 @@ from PIL import Image
 from utils.enums import ImageType
 from utils.filesys import FileSearcher
 from utils.misc import select_item
-# from utils.image import CardImage
-
 
 class CardFace:
-    def __init__(self, path:Path=None, image:Image.Image=None, cached:bool=False, processed:bool=False):
+    def __init__(self, path:Path=None, image:Image.Image=None, stream:bytes=None):
         self.path = path
         self.image = image
-        self.cached = cached
-        self.processed = processed
+        self.stream = stream
 
     def open_image(self, path:Path=None):
-        if not self.cached:
+        if not self.image:
             path = path or self.path
             self.image = Image.open(path) if path else None
-
-    def status(self)->dict[str:bool]:
-        return {'cached':self.cached, 'processed':self.processed}
 
     def as_string(self) -> str:
         return str(self.path)
     
     def __str__(self):
         return self.as_string()
-
 
 class Card:
     _sentinel = object()
@@ -58,25 +51,14 @@ class Card:
         self.front.open_image()
         self.back.open_image()
     
-    def status(self)->dict:
-        return {
-            'front': self.front.status(),
-            'back': self.back.status()
-        }
-
-    def cached(self, cached:bool|None = _sentinel)->bool:
-        if cached is not self._sentinel:
-            self.back.cached = cached
-        return self.back.cached
-    
     def info(self)->dict:
         return {
             'name': self.name,
-            'front': self.front,
+            'front': self.front.path,
             'front_image': bool(self.front.image),
-            'back': self.back,
+            'back': self.back.path,
             'back_image': bool(self.back.image),
-            'cached': self.cached()
+            'mdfc': self.mdfc,
         }
 
     def as_string(self)->str:
@@ -85,77 +67,74 @@ class Card:
     def __str__(self):
         return self.as_string()
 
-class Cards:
-    def __init__(self, single_sided:list[Card]=None, double_sided:list[Card]=None):
-        self.single_sided = single_sided or []
-        self.double_sided = double_sided or []
-        
+class CardFetcher:
+    def __init__(self, game_paths:dict, only_fronts:bool=False):
+        self.game_paths=game_paths
+        self.only_fronts = only_fronts
+
+        self.card=None
+        self.cached_backs = {}
+        self.cached_paths = {}
         self.ignored = []
-        self.cache = {}
+        self.totals={
+            'single':0,
+            'double':0,
+            'ignored':0,
+        }
 
-    def _check_cache(self, face:CardFace) -> CardFace:
-        if face.path not in self.cache:
-            face.cached=True
-            self.cache[face.path] = face
+        self.image_types = [x.value for x in ImageType]
+
+        self.double_searcher = FileSearcher(self.game_paths['double'],recursive=False)
+        self.back_searcher = FileSearcher(self.game_paths['back'], recursive=False)
+    
+    def _check_cached_path(self, path:Path)->Path:
+        if path not in self.cached_paths:
+            self.back_searcher.path = self.game_paths['back'] / path
+            back_path_search = self.back_searcher.bottom_up(self.game_paths['back'], self.image_types)
+            card_back_select_header = f'Back Images available for {path}'
+            self.cached_paths[path]= select_item(back_path_search, header=card_back_select_header)
         
-        return self.cache[face.path]
+        return self.cached_paths[path]
 
-    def add(self, card:Card, single_sided:bool):
-        if single_sided and card.mdfc:
-            self.ignored.append(card.name)
-        elif card.back.path:
-            self.double_sided.append(card)
-            card.back = self._check_cache(card.back)
-            # print('Cached', card.back.cached)
+    def _check_cached_face(self, face:CardFace)->CardFace:
+        if face.path in self.cached_backs:
+            face = self.cached_backs[face.path]
         else:
-            self.single_sided.append(card)
-        
-    def get(self, single_sided:bool)->list[Card]:
-        return self.single_sided if single_sided else self.double_sided
-    
-    def total(self)->dict[str,int]:
-        single = len(self.single_sided)
-        double = len(self.double_sided)
-        ignored = len(self.ignored)
-        return {'single':single,'double':double,'ignored':ignored,'total':single+double}
-    
-def get_cards(image_paths, only_fronts:bool) -> Cards:
-    image_types = [x.value for x in ImageType]
-    front_paths = FileSearcher(image_paths['front'], recursive=True).by_types(image_types)
-    cards = Cards()
-    skip = False
-    cached_paths = {}
+            self.cached_backs[face.path] = face
+        return face
 
-    # enumerated for debugging
-    for i, front_path in enumerate(front_paths):
+    def _is_valid(self, card:Card):
+        if self.only_fronts and card.mdfc:
+            self.ignored.append(card.name)
+            self.totals['ignored']+=1
+            return False
+        elif card.back.path:
+            self.totals['double']+=1
+            return True
+        else:
+            self.totals['single']+=1
+            return True
+    
+    def fetch(self, front_path:Path)->Card:
         card = Card()
-        
         card.front.path = front_path
         card.name = front_path.stem
         # print(f'{i} {card.name}')
-        rel_path = front_path.relative_to(image_paths['front'])
+        rel_path = front_path.relative_to(self.game_paths['front'])
 
-        double_path = FileSearcher(image_paths['double'],recursive=False).by_name(rel_path)
+        double_path = self.double_searcher.by_name(rel_path)
         if double_path:
             card.back.path = double_path[0]
             card.mdfc = True
+        elif not self.only_fronts: 
+            card.back.path = self._check_cached_path(rel_path.parent)
+            if card.back.path:
+                card.back = self._check_cached_face(card.back)
+        
+        if not self._is_valid(card):
+            card = None
 
-        elif not only_fronts: 
-            rel_dir = rel_path.parent
-            if rel_dir in cached_paths:
-                card.back.path = cached_paths[rel_dir]
-            else:
-                back_searcher = FileSearcher(image_paths['back'] / rel_dir, recursive=False)
-                back_path_search = back_searcher.bottom_up(image_paths['back'], image_types)
-                card_back_select_header = f'Back Images available for {rel_dir}'
-                card.back.path = select_item(back_path_search, header=card_back_select_header)
-                cached_paths[rel_dir]=card.back.path
-
-        cards.add(card, only_fronts)
-        card.load()
-        # print_card(card)
-    
-    return cards
+        return card 
 
 def print_card(card:Card):
     for k, v in card.info().items():

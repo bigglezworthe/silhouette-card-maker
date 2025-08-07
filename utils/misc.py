@@ -1,4 +1,4 @@
-def select_item(items:list, include_none:bool=True, header:str=None, footer:str="Select #:"):
+def select_item(items:list, include_none:bool=True, header:str=None, footer:str="Select #: "):
     if not items:
         return None
     elif len(items) == 1:

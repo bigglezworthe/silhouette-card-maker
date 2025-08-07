@@ -6,6 +6,8 @@ from pydantic import BaseModel
 from utils.enums import Paths, CardSize, PaperSize
 from utils.misc import split_by_value
 
+DEFAULT_PPI = 300
+
 class OffsetData(BaseModel):
     x_offset: int
     y_offset: int
@@ -48,14 +50,15 @@ class Layout:
         self.card_layout_size = card_layout_size
         self.template = card_layout.template
         self.card_positions = card_layout.xy_pairs()
+        self.ppi = DEFAULT_PPI
         
         self.cards_per_page = self._update_cpp()
-        self.max_border = self._calc_max_border(card_layout)
+        self.max_borders = self._calc_max_borders(card_layout)
 
     def _update_cpp(self):
         self.cards_per_page = len(self.card_positions)
     
-    def _calc_max_border(self, card_layout:CardLayout) -> tuple[int,int]:
+    def _calc_max_borders(self, card_layout:CardLayout) -> tuple[int,int]:
         x_pos = card_layout.x_pos
         y_pos = card_layout.y_pos
         w = self.card_layout_size.width
@@ -81,9 +84,8 @@ class Layout:
     def scale(self, factor:float):
         self.paper_layout = tuple(n * factor for n in self.paper_layout)
         self.card_layout_size.scale(factor)
-        self.max_border = tuple(n * factor for n in self.max_border)
+        self.max_border = tuple(n * factor for n in self.max_borders)
         self.card_positions = [tuple(n * factor for n in pos) for pos in self.card_positions]
-
 
 class Layouts(BaseModel):
     card_sizes: dict[CardSize, CardLayoutSize]

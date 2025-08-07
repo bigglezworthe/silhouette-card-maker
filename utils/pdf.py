@@ -4,6 +4,7 @@
 
 import fitz   #PyMuPDF
 import math
+import io 
 
 from pathlib import Path
 # from PIL import Image, ImageChops, ImageDraw, ImageFont, ImageOps
@@ -12,18 +13,18 @@ from utils.enums import Paths
 from utils.misc import px2pt, split_by_values
 from utils.image import process_card_image, get_image
 
-class CardPDF:
+class CardPDFGenerator:
     def __init__(self, 
         path:Path, 
         page_height:float, 
         page_width:float, 
-        bg:fitz.Pixmap, 
+        bg:fitz.Pixmap=None, 
         ppi:int,
-        ppi_scale:int,
+        ppi_scale:float,
         cards_per_page:int,
         font_path:Path,
         font_size:float,
-        page_name:str|None,
+        page_name:str=None,
         template:str
     ):
         self.path = path
@@ -35,7 +36,9 @@ class CardPDF:
         self.page_name = page_name
         self.template = template
 
-        self.pdf = fitz.open()
+        self.single_pdf = fitz.open()
+        self.double_pdf = fitz.open()
+
         self.current_page = None
         self.current_position = 0
 
@@ -53,9 +56,8 @@ class CardPDF:
         page_height:float=None, 
         page_width:float=None, 
         bg:fitz.Pixmap=None, 
-        cards_per_page:int=None,
         template:str=None
-    )->fitz.Page:
+    ) -> fitz.Page:
         height = self.to_scale(page_height) or self.height
         width = self.to_scale(page_width) or self.width
         bg = bg or self.bg
@@ -78,6 +80,9 @@ class CardPDF:
         self.insert_text(label, pos)
 
         return page
+    
+    def set_background(bg_path:Path):
+        self.bg=fitz.Pixmap(str(bg_path))
 
     def insert_text(self, 
         txt:str,
@@ -110,86 +115,6 @@ class CardPDF:
     
     def close(self):
        self. pdf.close()
-
-def generate_pdf(
-    cards:Cards,
-    output_path:Path,
-    output_images: bool,
-    layout: Layout,
-    crop_string: str,
-    extend_corners: int,
-    ppi: int,
-    quality: int,
-    load_offset: bool,
-    skip:[int],
-    name: str
-) -> CardPDF:
-
-    DEFAULT_PPI = 300
-    ppi_scale = ppi / DEFAULT_PPI
-    
-    card_row = [px2pt(y, ppi) for y in layout.card_layout.y_pos]
-    card_col = [px2pt(x, ppi) for x in layout.card_layout.x_pos]
-    cards_per_page = len(card_rows) * len(card_cols)
-
-    bg_path = Paths.ASSETS / f'{layout.paper_size}_registration.jpg'
-    bg_pix = fitz.Pixmap(str(bg_path))
-
-    page_width = px2pt(layout.paper_layout.width)
-    page_height = px2pt(layout.paper_layout.height)
-
-    pdf = CardPDF(
-        output_path = output_path,
-        page_height = page_width, 
-        page_width = page_width,
-        bg = pg_pix, 
-        ppi = ppi,
-        ppi_scale = ppi_scale,
-        cards_per_page=cards_per_page,
-        font_path = Paths.ASSETS / f'arial.ttf',
-        font_size = 40,
-        template = layout.card_layout.template,
-        name = name
-    )
-    
-    page = pdf.new_page()
-
-    max_card_bleed = calc_max_bleed(layout.card_layout)
-    extend_corners_scale = math.floor(extend_corners*ppi_scale)
-    crop_amount, crop_unit = split_float_unit(crop_string)
-    card_width_scaled = math.floor(layout.card_layout_size.width*ppi_scale)
-    card_height_scaled= math.floor(layout.card_layout_size.height*ppi_scale)
-
-    def process_card_image_wrapper(card_path:Path) -> Image.Image:
-        return process_card_image(
-            card_path,
-            card_width_scaled,
-            card_height_scaled,
-            ppi_scale,
-            crop_amount,
-            crop_unit,
-            max_card_bleed,
-            extend_corners_scale
-        )
-
-    for i, card in enumerate(cards.single_sided):
-        card_front_image = process_card_image_wrapper(get_image(card.front))
-
-    
-    
-    
-        
-
-
-
-
-
-
-    pdf.save(output_path)
-    pdf.close()
-
-
-
 
 
 

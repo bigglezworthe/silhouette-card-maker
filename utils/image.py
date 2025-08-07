@@ -1,33 +1,29 @@
 import math
-import re
+import io 
 
 from PIL import Image
 
-from utils.misc import split_float_unit
-from utils.card import Card, Cards
-from utils.layout import Layout
+from utils.card import Card
 
 class CardImageProcessor:
     def __init__(self, 
             card:Card=None,
             card_width:int,
             card_height:int,
-            ppi_scale:float,
-            crop_amount:float=None,
-            crop_unit:str|None=None,
-            max_card_bleed:tuple[int,int],
-            extend_corners:int,
+            scale:float,
+            crop_amount:float,
+            crop_unit:str|None,
+            borders:tuple[int,int]
     ):
         self.card = card
-        self.scale = ppi_scale
 
         self.width = card_width
         self.height = card_height
+        self.scale = scale
 
         self.crop = crop_amount
         self.crop_unit = crop_unit
-        self.max_bleed = max_card_bleed
-        self.extend_corners = extend_corners
+        self.borders = borders
 
         self.errors = []
     
@@ -38,34 +34,44 @@ class CardImageProcessor:
         card = card or self.card
         if not card:
             raise ValueError(f'No card supplied')
+
+        card.load()
         
-        if card.front.image and not card.front.processed:
-            card.front.image = self._process_face(card.front,image)
-            card.front.processed = True
-        if card.back.image and not card.back.processed:
-            card.back.image = self._process_face(card.back.image)
-            card.back.processed = True
+        if card.front.image and not card.front.stream:
+            card.front.stream = self._process_face(card.front,image, False)
+            card.front.image = None
+        if card.back.image and not card.back.stream:
+            card.back.stream = self._process_face(card.back.image, True)
+            card.back.image = None
         
         self.card = card
         return card
 
-    def _process_face_image(self, img:Image.Image)->Image.Image:
+    def _process_face(self, img:Image.Image, flip:bool)->bytes:
         cropped = crop_image(img, self.crop_amount, self.crop_unit)
         resized = cropped.resize((self.card_width, self.card_height))
-        extend_rect=(
-            -self.extend_corners, 
-            -self.extend_corners,
-            resized.width+self.extend_corners,
-            resized.height+self.extend_corners
+        extended = resized.crop(
+            -self.borders[0], 
+            -self.borders[1],
+            resized.width+self.borders[0],
+            resized.height+self.borders[1]
         )
-        return resized.crop(extend_rect)
+
+        scaled = extended.resize(self.scale)
+
+        if flip:
+            final = scaled.transpose(Image.FLIP_TOP_BOTTOM)
+        else:
+            final = scaled
+        
+        return image_to_bytes(final)
 
         # After Debugging, best to log errors instead of crash
         # try:
         #     self._process_card(card_image):
         # except Exception as {e}:
         #     self.errors.append(f'Error: {e}')
-
+    
 def crop_image(img:Image.Image, crop_amount:float, crop_unit:str|None)->Image.Image:
     ppi = img.info.get('dpi')
     if not ppi:
@@ -93,7 +99,10 @@ def crop_image(img:Image.Image, crop_amount:float, crop_unit:str|None)->Image.Im
     return img.crop((x_crop,y_crop,x-x_crop,y-y_crop))
 
 
-def get_image(path:Path)->Image.Image
+def get_image(path:Path)->Image.Image:
     return Image.open(Path)
 
-    
+def image_to_bytes(img:Image.Image) -> bytes:
+        buf = io.BytesIO()
+        img.save(buf, format=None)
+        return buf.getvalue()

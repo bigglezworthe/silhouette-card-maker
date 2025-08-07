@@ -1,5 +1,34 @@
 from pathlib import Path 
 
+class GamePathMaker:
+    def __init__(self, game_path:str, rel_path: str|None, output_path:str, output_is_folder:bool=False):
+        self.rel = rel_path or ''
+        self.game = self._require_item_wrapper(Path(game_path), 'Game')
+        self.front = self._require_item_wrapper(self.game / 'front' / self.rel, 'Front')
+        self.back = self._require_item_wrapper(self.game / 'back' / self.rel, 'Back')
+        self.double = self._require_item_wrapper(self.game / 'double_sided' / self.rel, 'Double-Sided')
+
+        if output_is_folder:
+            self.output = self._require_item_wrapper(self.game / output_path, 'Output') 
+        else:
+            self.output = self.game / output_path
+        
+    def _require_item_wrapper(self,path:Path, name:str)->Path:
+        return require_item(
+            path=path,
+            is_file=False,
+            error_msg=f'{name} Folder not found: {path}'
+        )
+
+    def dict(self):
+        return {
+            'game': self.game,
+            'front': self.front,
+            'back': self.back,
+            'double': self.double,
+            'output': self.output
+        }
+    
 class FileSearcher:
     def __init__(self, path: Path, recursive: bool = True, ignore_hidden: bool = False):
         self.path = path
@@ -38,7 +67,6 @@ class FileSearcher:
     def bottom_up(self, root_path:Path=None, types:list[str]=None) -> list[Path]:
         root_path = root_path or Path()
         search_dir = self.path
-
 
         while True:
             files = self.by_types(types, path=search_dir, recursive=False)
