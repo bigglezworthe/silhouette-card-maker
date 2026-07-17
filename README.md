@@ -1,6 +1,6 @@
 # Custom Card Games with Silhouette Cutting Machines
 
-![](hugo/static/images/display.jpg)
+![Silhouette Card Maker Banner](hugo/static/images/scm_banner.png)
 
 Ever wanted to make your own custom card game but without the hassle of a craft knife, a rotary cutter, or a paper guillotine? How about making your own proxies to playtest your favorite TCG?
 
