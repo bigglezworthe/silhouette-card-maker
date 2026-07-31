@@ -1,5 +1,5 @@
 from os import path
-from re import compile, search, sub
+from re import compile, search
 from enum import Enum
 import cloudscraper
 from time import sleep
@@ -52,14 +52,6 @@ def fetch_card_art(index: int, card_number: str, quantity: int, source: ImageSer
                     f.write(card_art)
 
 def fetch_card_number(name: str) -> str:
-    # # Edge case of cards that are misnamed on the backend
-    # if name == "Spirit's Refuge":
-    #     name = "Spirit's Rifuge"
-
-    # # Get the internal information based on the card name to route to the card itself
-    # sanitized = sub(r'[^A-Za-z0-9 \-]+', '', name)
-    # slugified = sub(r'\s+', '-', sanitized).lower()
-
     url = f"https://riftmana.com/wp-json/wp/v2/cards?search={name}"
     name_response = request_api(url)
 
