@@ -1,5 +1,4 @@
 import json
-import math
 import os
 import tempfile
 import pytest
@@ -7,32 +6,38 @@ from pathlib import Path
 from PIL import Image
 
 import utilities
-from utilities import (
+from src.crop import (
     parse_crop_string,
-    convertInToCrop,
-    get_image_file_paths,
-    check_paths_subset,
-    resolve_image_with_any_extension,
-    calculate_max_print_bleed,
-    delete_hidden_files_in_directory,
-    get_directory,
-    offset_images,
-    save_offset,
-    load_saved_offset,
-    OffsetData,
-    get_back_card_image_path,
+    convert_inch_to_crop,
     crop_and_scale_image,
-    draw_card_with_bleed,
-    draw_card_layout,
-    add_front_back_pages,
-    FitMode,
-    asset_directory,
+)
+from src.paths import (
+    get_directory,
+    get_image_file_paths,
+    get_back_card_image_path,
+    delete_hidden_files_in_directory,
+)
+from src.layouts import (
     merge_extra_layouts,
     extra_layout_paths,
     find_extra_layout_owner,
     EXTRA_LAYOUTS_ENV,
+    EXTRA_LAYOUTS_PATH,
 )
-from enums import Orientation
+from utilities import (
+    check_paths_subset,
+    resolve_image_with_any_extension,
+    calculate_max_print_bleed,
+    offset_images,
+    save_offset,
+    load_saved_offset,
+    OffsetData,
+    draw_card_with_bleed,
+    draw_card_layout,
+    add_front_back_pages,
+)
+
+from src.enums import Orientation, FitMode
 
 
 class TestParseCropString:
@@ -104,50 +109,50 @@ class TestParseCropString:
     def test_invalid_format_raises(self):
         """Invalid format should raise ValueError."""
         with pytest.raises(ValueError, match="Invalid crop format"):
-            parse_crop_string("invalid", 750, 1050)
+            _ = parse_crop_string("invalid", 750, 1050)
 
     def test_invalid_unit_raises(self):
         """Invalid unit should raise ValueError."""
         with pytest.raises(ValueError, match="Invalid crop format"):
-            parse_crop_string("3cm", 750, 1050)
+            _ = parse_crop_string("3cm", 750, 1050)
 
     def test_empty_string_raises(self):
         """Empty string should raise ValueError."""
         with pytest.raises(ValueError, match="Invalid crop format"):
-            parse_crop_string("", 750, 1050)
+            _ = parse_crop_string("", 750, 1050)
 
 
 class TestConvertInToCrop:
-    """Tests for convertInToCrop() function."""
+    """Tests for convert_inch_to_crop() function."""
 
     def test_zero_crop(self):
         """Zero inch crop should return zero percentages."""
-        assert convertInToCrop(0, 750, 1050) == (0, 0)
+        assert convert_inch_to_crop(0, 750, 1050) == (0, 0)
 
     def test_exact_values(self):
         """Should compute correct percentages for known inputs."""
         # card_width_mm = 750/300 = 2.5in, card_height_mm = 1050/300 = 3.5in
         # crop_x = 2 * 0.125 / 2.5 * 100 = 10.0
         # crop_y = 2 * 0.125 / 3.5 * 100 ≈ 7.1429
-        result = convertInToCrop(0.125, 750, 1050)
+        result = convert_inch_to_crop(0.125, 750, 1050)
         assert result[0] == pytest.approx(10.0)
         assert result[1] == pytest.approx(100 / 14)
 
     def test_x_y_different_for_nonsquare(self):
         """Non-square card should have different x and y crop percentages."""
-        result = convertInToCrop(0.1, 750, 1050)
+        result = convert_inch_to_crop(0.1, 750, 1050)
         # Different dimensions should give different percentages
         assert result[0] != result[1]
 
     def test_square_card_same_crop(self):
         """Square card should have same x and y crop percentages."""
-        result = convertInToCrop(0.1, 750, 750)
+        result = convert_inch_to_crop(0.1, 750, 750)
         assert result[0] == result[1]
 
     def test_larger_crop_larger_percentage(self):
         """Larger inch crop should produce larger percentage."""
-        result_small = convertInToCrop(0.1, 750, 1050)
-        result_large = convertInToCrop(0.2, 750, 1050)
+        result_small = convert_inch_to_crop(0.1, 750, 1050)
+        result_large = convert_inch_to_crop(0.2, 750, 1050)
         assert result_large[0] > result_small[0]
         assert result_large[1] > result_small[1]
 
@@ -188,7 +193,7 @@ class TestGetImageFilePaths:
             # Create a text file
             txt_path = os.path.join(tmpdir, 'readme.txt')
             with open(txt_path, 'w') as f:
-                f.write('hello')
+                _ = f.write('hello')
 
             result = get_image_file_paths(tmpdir)
             assert 'readme.txt' not in result
@@ -293,7 +298,7 @@ class TestResolveImageWithAnyExtension:
         with tempfile.TemporaryDirectory() as tmpdir:
             query_path = os.path.join(tmpdir, 'nonexistent.png')
             with pytest.raises(FileNotFoundError, match="Missing image"):
-                resolve_image_with_any_extension(query_path)
+                _ = resolve_image_with_any_extension(query_path)
 
     def test_ambiguous_match_raises(self):
         """Should raise ValueError if multiple matches found."""
@@ -306,7 +311,7 @@ class TestResolveImageWithAnyExtension:
             # Request a non-existent extension to trigger glob search
             query_path = os.path.join(tmpdir, 'test.gif')
             with pytest.raises(ValueError, match="Ambiguous"):
-                resolve_image_with_any_extension(query_path)
+                _ = resolve_image_with_any_extension(query_path)
 
 
 class TestCalculateMaxPrintBleed:
@@ -380,16 +385,16 @@ class TestDeleteHiddenFilesInDirectory:
 
     def test_empty_path_does_nothing(self):
         """Empty path should not raise."""
-        delete_hidden_files_in_directory("")
+        delete_hidden_files_in_directory(Path(""))
 
     def test_removes_ds_store(self):
         """Should remove .DS_Store files."""
         with tempfile.TemporaryDirectory() as tmpdir:
             ds_store = os.path.join(tmpdir, '.DS_Store')
             with open(ds_store, 'w') as f:
-                f.write('junk')
+                _ = f.write('junk')
 
-            delete_hidden_files_in_directory(tmpdir)
+            delete_hidden_files_in_directory(Path(tmpdir))
             assert not os.path.exists(ds_store)
 
     def test_removes_thumbs_db(self):
@@ -397,9 +402,9 @@ class TestDeleteHiddenFilesInDirectory:
         with tempfile.TemporaryDirectory() as tmpdir:
             thumbs = os.path.join(tmpdir, 'Thumbs.db')
             with open(thumbs, 'w') as f:
-                f.write('junk')
+                _ = f.write('junk')
 
-            delete_hidden_files_in_directory(tmpdir)
+            delete_hidden_files_in_directory(Path(tmpdir))
             assert not os.path.exists(thumbs)
 
     def test_removes_desktop_ini(self):
@@ -407,9 +412,9 @@ class TestDeleteHiddenFilesInDirectory:
         with tempfile.TemporaryDirectory() as tmpdir:
             desktop_ini = os.path.join(tmpdir, 'desktop.ini')
             with open(desktop_ini, 'w') as f:
-                f.write('junk')
+                _ = f.write('junk')
 
-            delete_hidden_files_in_directory(tmpdir)
+            delete_hidden_files_in_directory(Path(tmpdir))
             assert not os.path.exists(desktop_ini)
 
     def test_removes_apple_double_files(self):
@@ -417,9 +422,9 @@ class TestDeleteHiddenFilesInDirectory:
         with tempfile.TemporaryDirectory() as tmpdir:
             apple_double = os.path.join(tmpdir, '._image.png')
             with open(apple_double, 'w') as f:
-                f.write('junk')
+                _ = f.write('junk')
 
-            delete_hidden_files_in_directory(tmpdir)
+            delete_hidden_files_in_directory(Path(tmpdir))
             assert not os.path.exists(apple_double)
 
     def test_preserves_normal_files(self):
@@ -427,9 +432,9 @@ class TestDeleteHiddenFilesInDirectory:
         with tempfile.TemporaryDirectory() as tmpdir:
             normal_file = os.path.join(tmpdir, 'image.png')
             with open(normal_file, 'w') as f:
-                f.write('data')
+                _ = f.write('data')
 
-            delete_hidden_files_in_directory(tmpdir)
+            delete_hidden_files_in_directory(Path(tmpdir))
             assert os.path.exists(normal_file)
 
 
@@ -439,7 +444,7 @@ class TestGetDirectory:
     def test_directory_path(self):
         """Directory path should return absolute directory path."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            result = get_directory(tmpdir)
+            result = get_directory(Path(tmpdir))
             assert result == os.path.abspath(tmpdir)
 
     def test_file_path(self):
@@ -447,9 +452,9 @@ class TestGetDirectory:
         with tempfile.TemporaryDirectory() as tmpdir:
             file_path = os.path.join(tmpdir, 'test.txt')
             with open(file_path, 'w') as f:
-                f.write('test')
+                _ = f.write('test')
 
-            result = get_directory(file_path)
+            result = get_directory(Path(file_path))
             assert result == os.path.abspath(tmpdir)
 
 
@@ -713,7 +718,7 @@ class TestDrawCardWithBleed:
         """
         card = Image.new('RGB', (10, 10), color='red')
         base = Image.new('RGB', (40, 40), color='white')
-        draw_card_with_bleed(card, base, 15, 15, (5, 5))
+        _ = draw_card_with_bleed(card, base, 15, 15, (5, 5))
         # Card area
         assert base.getpixel((15, 15)) == self.RED
         assert base.getpixel((24, 24)) == self.RED
@@ -738,7 +743,7 @@ class TestDrawCardWithBleed:
         """
         card = Image.new('RGB', (10, 10), color='red')
         base = Image.new('RGB', (40, 40), color='white')
-        draw_card_with_bleed(card, base, 15, 15, (5, 5))
+        _ = draw_card_with_bleed(card, base, 15, 15, (5, 5))
         # Top bleed: top row extended upward
         assert base.getpixel((15, 14)) == self.RED
         assert base.getpixel((15, 10)) == self.RED
@@ -774,7 +779,7 @@ class TestDrawCardWithBleed:
         """
         card = Image.new('RGB', (10, 10), color='red')
         base = Image.new('RGB', (40, 40), color='white')
-        draw_card_with_bleed(card, base, 15, 15, (5, 5))
+        _ = draw_card_with_bleed(card, base, 15, 15, (5, 5))
         # Top-left corner bleed region
         assert base.getpixel((10, 10)) == self.RED
         assert base.getpixel((14, 14)) == self.RED
@@ -806,7 +811,7 @@ class TestDrawCardWithBleed:
         """
         card = Image.new('RGB', (10, 10), color='red')
         base = Image.new('RGB', (40, 40), color='white')
-        draw_card_with_bleed(card, base, 15, 15, (0, 0))
+        _ = draw_card_with_bleed(card, base, 15, 15, (0, 0))
         # Card area
         assert base.getpixel((15, 15)) == self.RED
         assert base.getpixel((24, 24)) == self.RED
@@ -1593,12 +1598,12 @@ class TestExtraLayoutPaths:
 
     def test_empty_when_nothing_configured(self):
         os.environ.pop(EXTRA_LAYOUTS_ENV, None)
-        original_dir = utilities.EXTRA_LAYOUTS_DIR
-        utilities.EXTRA_LAYOUTS_DIR = Path(tempfile.gettempdir()) / "scm-test-nonexistent-dir"
+        original_dir = EXTRA_LAYOUTS_PATH
+        EXTRA_LAYOUTS_PATH = Path(tempfile.gettempdir()) / "scm-test-nonexistent-dir"
         try:
             assert extra_layout_paths() == []
         finally:
-            utilities.EXTRA_LAYOUTS_DIR = original_dir
+            EXTRA_LAYOUTS_PATH = original_dir
 
     def test_dir_files_sorted_before_env_files(self):
         with tempfile.TemporaryDirectory() as dir_tmpdir, tempfile.TemporaryDirectory() as env_tmpdir:
@@ -1606,13 +1611,13 @@ class TestExtraLayoutPaths:
             a_path = self.write_json(dir_tmpdir, "a.json")
             env_path = self.write_json(env_tmpdir, "c.json")
 
-            original_dir = utilities.EXTRA_LAYOUTS_DIR
-            utilities.EXTRA_LAYOUTS_DIR = Path(dir_tmpdir)
+            original_dir = EXTRA_LAYOUTS_PATH
+            EXTRA_LAYOUTS_PATH = Path(dir_tmpdir)
             os.environ[EXTRA_LAYOUTS_ENV] = str(env_path)
             try:
                 assert extra_layout_paths() == [a_path, b_path, env_path]
             finally:
-                utilities.EXTRA_LAYOUTS_DIR = original_dir
+                EXTRA_LAYOUTS_PATH = original_dir
                 del os.environ[EXTRA_LAYOUTS_ENV]
 
 
@@ -1633,25 +1638,25 @@ class TestFindExtraLayoutOwner:
             sorcery_path = self.write_json(tmpdir, "b-sorcery.json", {
                 "card_sizes": {"sorcery": {"width": "2.61in", "height": "3.74in"}},
             })
-            original_dir = utilities.EXTRA_LAYOUTS_DIR
-            utilities.EXTRA_LAYOUTS_DIR = Path(tmpdir)
+            original_dir = EXTRA_LAYOUTS_PATH
+            EXTRA_LAYOUTS_PATH = Path(tmpdir)
             try:
                 assert find_extra_layout_owner("card_sizes", "sorcery") == sorcery_path
                 assert find_extra_layout_owner("card_sizes", "mtg") == mtg_path
             finally:
-                utilities.EXTRA_LAYOUTS_DIR = original_dir
+                EXTRA_LAYOUTS_PATH = original_dir
 
     def test_returns_none_when_not_found(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             self.write_json(tmpdir, "a.json", {
                 "card_sizes": {"mtg": {"width": "2.5in", "height": "3.5in"}},
             })
-            original_dir = utilities.EXTRA_LAYOUTS_DIR
-            utilities.EXTRA_LAYOUTS_DIR = Path(tmpdir)
+            original_dir = EXTRA_LAYOUTS_PATH
+            EXTRA_LAYOUTS_PATH = Path(tmpdir)
             try:
                 assert find_extra_layout_owner("card_sizes", "nonexistent") is None
             finally:
-                utilities.EXTRA_LAYOUTS_DIR = original_dir
+                EXTRA_LAYOUTS_PATH = original_dir
 
 
 class TestMergeExtraLayouts:
@@ -1748,36 +1753,36 @@ class TestMergeExtraLayouts:
             self.write_extra_file(tmpdir, "a.json", {
                 "card_sizes": {"mtg": {"width": "2.5in", "height": "3.5in"}},
             })
-            original_dir = utilities.EXTRA_LAYOUTS_DIR
-            utilities.EXTRA_LAYOUTS_DIR = Path(tmpdir)
+            original_dir = EXTRA_LAYOUTS_PATH
+            EXTRA_LAYOUTS_PATH = Path(tmpdir)
             try:
                 config = merge_extra_layouts(self.base_config())
                 assert config["card_sizes"]["mtg"] == {"width": "2.5in", "height": "3.5in"}
             finally:
-                utilities.EXTRA_LAYOUTS_DIR = original_dir
+                EXTRA_LAYOUTS_PATH = original_dir
 
     def test_missing_extra_layouts_dir_is_noop(self):
         os.environ.pop(EXTRA_LAYOUTS_ENV, None)
-        original_dir = utilities.EXTRA_LAYOUTS_DIR
-        utilities.EXTRA_LAYOUTS_DIR = Path(tempfile.gettempdir()) / "scm-test-nonexistent-dir"
+        original_dir = EXTRA_LAYOUTS_PATH
+        EXTRA_LAYOUTS_PATH = Path(tempfile.gettempdir()) / "scm-test-nonexistent-dir"
         try:
             config = merge_extra_layouts(self.base_config())
             assert config == self.base_config()
         finally:
-            utilities.EXTRA_LAYOUTS_DIR = original_dir
+            EXTRA_LAYOUTS_PATH = original_dir
 
     def test_dir_file_collision_raises(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             self.write_extra_file(tmpdir, "a.json", {
                 "card_sizes": {"poker": {"width": "1in", "height": "1in"}},
             })
-            original_dir = utilities.EXTRA_LAYOUTS_DIR
-            utilities.EXTRA_LAYOUTS_DIR = Path(tmpdir)
+            original_dir = EXTRA_LAYOUTS_PATH
+            EXTRA_LAYOUTS_PATH = Path(tmpdir)
             try:
                 with pytest.raises(ValueError):
                     merge_extra_layouts(self.base_config())
             finally:
-                utilities.EXTRA_LAYOUTS_DIR = original_dir
+                EXTRA_LAYOUTS_PATH = original_dir
 
     def test_dir_files_merge_before_env_var_files(self):
         with tempfile.TemporaryDirectory() as dir_tmpdir, tempfile.TemporaryDirectory() as env_tmpdir:
@@ -1787,15 +1792,15 @@ class TestMergeExtraLayouts:
             env_path = self.write_extra_file(env_tmpdir, "b.json", {
                 "card_sizes": {"sorcery": {"width": "2.61in", "height": "3.74in"}},
             })
-            original_dir = utilities.EXTRA_LAYOUTS_DIR
-            utilities.EXTRA_LAYOUTS_DIR = Path(dir_tmpdir)
+            original_dir = EXTRA_LAYOUTS_PATH
+            EXTRA_LAYOUTS_PATH = Path(dir_tmpdir)
             os.environ[EXTRA_LAYOUTS_ENV] = env_path
             try:
                 config = merge_extra_layouts(self.base_config())
                 assert "mtg" in config["card_sizes"]
                 assert "sorcery" in config["card_sizes"]
             finally:
-                utilities.EXTRA_LAYOUTS_DIR = original_dir
+                EXTRA_LAYOUTS_PATH = original_dir
                 del os.environ[EXTRA_LAYOUTS_ENV]
 
 

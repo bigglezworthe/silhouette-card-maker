@@ -7,8 +7,8 @@ import matplotlib.lines as mlines
 from PIL import Image
 import io
 
-import size_convert
-from enums import Orientation, Registration
+from src import measurements
+from src.enums import Orientation, Registration
 
 # Registration mark constraints (in mm)
 MAX_REG_LENGTH_MM = 20.0
@@ -52,12 +52,12 @@ def generate_reg_mark(
     Returns:
         PIL Image with registration marks drawn on a white background.
     """
-    paper_width_mm = size_convert.size_to_mm(paper_width)
-    paper_height_mm = size_convert.size_to_mm(paper_height)
-    inset_mm = size_convert.size_to_mm(inset)
-    thickness_mm = size_convert.size_to_mm(thickness)
-    thickness_pt = size_convert.size_to_pt(thickness)
-    length_mm = size_convert.size_to_mm(length)
+    paper_width_mm = measurements.size_to_mm(paper_width)
+    paper_height_mm = measurements.size_to_mm(paper_height)
+    inset_mm = measurements.size_to_mm(inset)
+    thickness_mm = measurements.size_to_mm(thickness)
+    thickness_pt = measurements.size_to_pt(thickness)
+    length_mm = measurements.size_to_mm(length)
 
     # Constrain registration mark parameters within valid ranges.
     length_mm = max(MIN_REG_LENGTH_MM, min(length_mm, MAX_REG_LENGTH_MM))
@@ -390,13 +390,13 @@ def generate_layout(
     CARD_DISTANCE = "1.25mm"
 
     # Convert all dimensions to pixels
-    page_width_px = size_convert.size_to_pixel(paper_width, ppi)
-    page_height_px = size_convert.size_to_pixel(paper_height, ppi)
-    card_width_px = size_convert.size_to_pixel(card_width, ppi)
-    card_height_px = size_convert.size_to_pixel(card_height, ppi)
-    card_distance_px = size_convert.size_to_pixel(CARD_DISTANCE, ppi)
-    inset_px = size_convert.size_to_pixel(inset, ppi)
-    length_px = size_convert.size_to_pixel(length, ppi)
+    page_width_px = measurements.size_to_pixel(paper_width, ppi)
+    page_height_px = measurements.size_to_pixel(paper_height, ppi)
+    card_width_px = measurements.size_to_pixel(card_width, ppi)
+    card_height_px = measurements.size_to_pixel(card_height, ppi)
+    card_distance_px = measurements.size_to_pixel(CARD_DISTANCE, ppi)
+    inset_px = measurements.size_to_pixel(inset, ppi)
+    length_px = measurements.size_to_pixel(length, ppi)
 
     # Normalize orientation
     page_width_px, page_height_px = normalize_page_size(
