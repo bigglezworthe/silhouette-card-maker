@@ -7,17 +7,39 @@ import os
 import re
 from glob import glob
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional
 from xml.dom import ValidationErr
 
 from natsort import natsorted
 from PIL import Image, ImageChops, ImageDraw, ImageFont, ImageOps
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 import page_manager
-import src.size_convert as size_convert
-from src.enums import FitMode, Registration, Orientation, OrientationMode, Variant
-from src.layouts import load_layout_config
+import size_convert
+from src.enums import Registration, Orientation, OrientationMode, Variant
+
+# Specify directory locations
+# Use Path(__file__).parent to ensure paths work regardless of where script is run from
+SCRIPT_DIR = Path(__file__).parent
+asset_directory = SCRIPT_DIR / 'assets'
+
+layouts_filename = 'layouts.json'
+layouts_path = asset_directory / layouts_filename
+
+# Optional extra layout definitions to merge on top of layouts.json. Lets a layout-consuming
+# project layer its own card sizes, paper sizes, and layouts on top of this repo's without
+# modifying it. Opt-in: both are empty/unset by default, so load_layout_config() behaves
+# exactly as if this didn't exist. Two ways to supply extra files, merged in this order:
+#   1. Drop any number of *.json files into EXTRA_LAYOUTS_DIR (merged in filename order) -
+#      no configuration needed, just copy a file in.
+#   2. Point EXTRA_LAYOUTS_ENV at one or more file paths (os.pathsep-separated, merged in
+#      order) - for files that live outside EXTRA_LAYOUTS_DIR.
+EXTRA_LAYOUTS_DIR = asset_directory / 'extra_layouts'
+EXTRA_LAYOUTS_ENV = 'SCM_EXTRA_LAYOUTS'
+
+# Optional override for where cutting templates get written/read (default: SCRIPT_DIR-relative
+# cutting_templates/ directories in generate_dxf.py and dxf_to_studio3.py).
+CUTTING_TEMPLATES_DIR_ENV = 'SCM_CUTTING_TEMPLATES_DIR'
 
 # Specify valid mimetypes for images
 # List can be found here: https://github.com/h2non/filetype.py?tab=readme-ov-file#image
@@ -48,6 +70,159 @@ valid_mimetypes = (
 MINIMUM_BLEED = 15
 
 
+class CardSizeDef(BaseModel):
+    width: str
+    height: str
+    radius: Optional[str] = None
+    aliases: Optional[List[str]] = None
+
+
+
+class RegistrationSettings(BaseModel):
+    inset: Optional[str] = None
+    thickness: Optional[str] = None
+    length: Optional[str] = None
+
+
+class VariantRegistrationSettings(BaseModel):
+    default: RegistrationSettings
+    borderless: RegistrationSettings
+
+
+class DefaultSettings(BaseModel):
+    card_radius: str
+    registration: VariantRegistrationSettings
+
+
+class SpecialtyCardSizeDef(BaseModel):
+    name: Optional[str] = None
+    width: Optional[str] = None
+    height: Optional[str] = None
+    radius: Optional[str] = None
+
+
+class SpecialtyPaperSizeDef(BaseModel):
+    name: Optional[str] = None
+    width: Optional[str] = None
+    height: Optional[str] = None
+
+
+class SpecialtyLayoutDef(BaseModel):
+    card_size: SpecialtyCardSizeDef
+    paper_size: SpecialtyPaperSizeDef
+    orientation: Orientation = Orientation.LANDSCAPE
+    registration_orientation: Optional[Orientation] = None
+    version: int = 1
+    num_rows: Optional[int] = None
+    num_cols: Optional[int] = None
+    registration: Optional[RegistrationSettings] = None
+
+
+class FitMode(str, Enum):
+    STRETCH = "stretch"
+    CROP = "crop"
+
+class CardLayoutSize(BaseModel):
+    width: int
+    height: int
+
+class PaperSizeDef(BaseModel):
+    width: str
+    height: str
+    aliases: Optional[List[str]] = None
+
+    @model_validator(mode='after')
+    def width_gte_height(self) -> 'PaperSizeDef':
+        w = size_convert.size_to_mm(self.width)
+        h = size_convert.size_to_mm(self.height)
+        if w < h:
+            raise ValueError(f'Paper width ({self.width}) must be >= height ({self.height}). Paper sizes are stored as landscape.')
+        return self
+
+class CardLayout(BaseModel):
+    orientation: Orientation
+    registration_orientation: Optional[Orientation] = None
+    version: int
+    num_rows: Optional[int] = None
+    num_cols: Optional[int] = None
+    registration: Optional[RegistrationSettings] = None
+
+class LayoutConfig(BaseModel):
+    ppi: int
+    defaults: DefaultSettings
+    card_sizes: Dict[str, CardSizeDef]
+    paper_sizes: Dict[str, PaperSizeDef]
+    layouts: Dict[str, Dict[str, Dict[str, CardLayout]]]  # layouts[paper][card][variant]
+    specialty_layouts: Optional[Dict[str, SpecialtyLayoutDef]] = None
+
+
+def extra_layout_paths() -> list[Path]:
+    """Return every extra layout file, in merge/precedence order.
+
+    Every *.json file found in EXTRA_LAYOUTS_DIR (sorted by filename), followed by every
+    file listed in EXTRA_LAYOUTS_ENV (an os.pathsep-separated list). Empty if neither is
+    configured.
+    """
+    dir_paths = sorted(EXTRA_LAYOUTS_DIR.glob('*.json')) if EXTRA_LAYOUTS_DIR.is_dir() else []
+    env_paths = [Path(p) for p in os.environ.get(EXTRA_LAYOUTS_ENV, '').split(os.pathsep) if p]
+    return dir_paths + env_paths
+
+
+def find_extra_layout_owner(section: str, key: str) -> Path | None:
+    """Return the first file from extra_layout_paths() whose `section` dict already
+    contains `key` (e.g. section='card_sizes', key='mtg'), or None if none do."""
+    for path in extra_layout_paths():
+        with open(path, 'r') as f:
+            if key in json.load(f).get(section, {}):
+                return path
+    return None
+
+
+def merge_extra_layouts(raw_config: dict) -> dict:
+    """Merge extra card_sizes/paper_sizes/layouts on top of raw_config, in place.
+
+    Merges every file from extra_layout_paths(), in order, into raw_config's
+    card_sizes/paper_sizes/layouts dicts. Each key (card size, paper size, or
+    paper+card+variant layout) must be new: raise ValueError on any collision with raw_config
+    or an earlier file in the merge, since these files are meant to be pure additions, not
+    overrides. No-op if extra_layout_paths() is empty.
+    """
+    for path in extra_layout_paths():
+        with open(path, 'r') as f:
+            extra = json.load(f)
+
+        for section in ('card_sizes', 'paper_sizes'):
+            for key, value in extra.get(section, {}).items():
+                if key in raw_config[section]:
+                    raise ValueError(f"'{key}' in {section} of {path} already defined")
+                raw_config[section][key] = value
+
+        for paper, cards in extra.get('layouts', {}).items():
+            for card, variants in cards.items():
+                for variant, layout_def in variants.items():
+                    if variant in raw_config['layouts'].get(paper, {}).get(card, {}):
+                        raise ValueError(f"layout '{paper}'/'{card}'/'{variant}' in {path} already defined")
+                    raw_config['layouts'].setdefault(paper, {}).setdefault(card, {})[variant] = layout_def
+
+    return raw_config
+
+
+
+def resolve_cutting_templates_dir(default: Path) -> Path:
+    """Return the CUTTING_TEMPLATES_DIR_ENV override if set, else default."""
+    override = os.environ.get(CUTTING_TEMPLATES_DIR_ENV)
+    return Path(override) if override else default
+
+
+def load_layout_config() -> LayoutConfig:
+    """Load and validate layouts.json from the assets directory, merging in any extra
+    layout definitions from EXTRA_LAYOUTS_ENV."""
+    with open(layouts_path, 'r') as f:
+        raw_config = json.load(f)
+    merge_extra_layouts(raw_config)
+    return LayoutConfig(**raw_config)
+
+
 # Borderless mode tricks Silhouette Studio into using a smaller effective inset than its
 # 10mm minimum (MIN_REG_INSET_MM) by inflating the declared paper size. The software
 # still places registration marks at 10mm from the declared edge, but since the declared
@@ -60,6 +235,72 @@ MINIMUM_BLEED = 15
 _layout_config = load_layout_config()
 BORDERLESS_INSET_MM = size_convert.size_to_mm(_layout_config.defaults.registration.borderless.inset)
 BORDERLESS_EXPANSION_MM = (page_manager.MIN_REG_INSET_MM - BORDERLESS_INSET_MM) * 2
+
+
+def resolve_card_size_alias(layout_config: LayoutConfig, card_size: str) -> str:
+    """Resolve a card size alias to its canonical name. Returns the original if not an alias."""
+    for name, card_def in layout_config.card_sizes.items():
+        if card_def.aliases and card_size in card_def.aliases:
+            print(f'Card size "{card_size}" is an alias of "{name}". Using "{name}" card size and cutting template.')
+            return name
+    return card_size
+
+
+def resolve_paper_size_alias(layout_config: LayoutConfig, paper_size: str) -> str:
+    """Resolve a paper size alias to its canonical name. Returns the original if not an alias."""
+    for name, paper_def in layout_config.paper_sizes.items():
+        if paper_def.aliases and paper_size in paper_def.aliases:
+            print(f'Paper size "{paper_size}" is an alias of "{name}". Using "{name}" paper size and cutting template.')
+            return name
+    return paper_size
+
+
+def get_all_card_size_names(layout_config: LayoutConfig) -> List[str]:
+    """Return all valid card size names: canonical names and their aliases.
+    standard, poker, bridge first; then alphabetical; then names starting with a digit."""
+    names = list(layout_config.card_sizes.keys())
+    for card_def in layout_config.card_sizes.values():
+        if card_def.aliases:
+            names.extend(card_def.aliases)
+    priority = ["standard", "poker", "bridge"]
+    priority_names = [n for n in priority if n in names]
+    rest = sorted((n for n in names if n not in priority), key=lambda n: (n[0].isdigit(), n))
+    return priority_names + rest
+
+
+def get_all_paper_size_names(layout_config: LayoutConfig) -> List[str]:
+    """Return all valid paper size names: canonical names and their aliases.
+    letter, tabloid, a4, a3, arch_b first; then alphabetical; then names starting with a digit."""
+    names = list(layout_config.paper_sizes.keys())
+    for paper_def in layout_config.paper_sizes.values():
+        if paper_def.aliases:
+            names.extend(paper_def.aliases)
+    priority = ["letter", "tabloid", "a4", "a3", "arch_b"]
+    priority_names = [n for n in priority if n in names]
+    rest = sorted((n for n in names if n not in priority), key=lambda n: (n[0].isdigit(), n))
+    return priority_names + rest
+
+
+def get_all_specialty_layout_names(layout_config: LayoutConfig) -> List[str]:
+    """Return all specialty layout names, sorted alphabetically."""
+    if not layout_config.specialty_layouts:
+        return []
+    return sorted(layout_config.specialty_layouts.keys())
+
+
+def template_name(paper_size: str, card_size: str, variant: Variant, version: int) -> str:
+    """Compose the standard template name: {paper_size}-{card_size}-{variant}-v{version}.
+
+    Note: 'default' variant is omitted from the name for backwards compatibility.
+    Examples:
+        - default: letter-bridge-v4
+        - borderless: letter-bridge-borderless-v1
+    """
+    if variant == Variant.DEFAULT:
+        return f"{paper_size}-{card_size}-v{version}"
+    else:
+        return f"{paper_size}-{card_size}-{variant.value}-v{version}"
+
 
 # Known junk files across OSes
 EXTRANEOUS_FILES = {

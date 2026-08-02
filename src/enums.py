@@ -20,7 +20,6 @@ class OrientationMode(str, Enum):
 
 
 class Variant(str, Enum):
-    """Template variant types."""
     DEFAULT = "default"
     BORDERLESS = "borderless"
 
@@ -28,3 +27,8 @@ class Variant(str, Enum):
 class Unit(str, Enum):
     MM = "mm"
     IN = "in"
+
+
+class FitMode(str, Enum):
+    STRETCH = "stretch"
+    CROP = "crop"

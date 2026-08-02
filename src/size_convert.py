@@ -1,7 +1,6 @@
 import re
-
     
-def size_to_pixel(size_string, ppi):    
+def size_to_pixel(size_string: str, ppi: int) -> int:    
     float_pattern = r"(?:\d+\.\d*|\.\d+|\d+)"  # matches 1.0, .5, or 2
     
     # Match mm
@@ -20,7 +19,7 @@ def size_to_pixel(size_string, ppi):
     return round(float(size_string))
 
 
-def size_to_pt(size_string):
+def size_to_pt(size_string:str) -> float:
     float_pattern = r"(?:\d+\.\d*|\.\d+|\d+)"  # matches 1.0, .5, or 2
     
     # Match mm
@@ -38,7 +37,7 @@ def size_to_pt(size_string):
     #If no match
     return float(size_string)
 
-def size_to_mm(size_string):
+def size_to_mm(size_string: str) -> float:
     float_pattern = r"(?:\d+\.\d*|\.\d+|\d+)"  # matches 1.0, .5, or 2
     
     # Match mm
@@ -56,7 +55,7 @@ def size_to_mm(size_string):
     #If no match
     return float(size_string)
 
-def size_to_in(size_string):
+def size_to_in(size_string: str) -> float:
     float_pattern = r"(?:\d+\.\d*|\.\d+|\d+)"  # matches 1.0, .5, or 2
     
     # Match mm
