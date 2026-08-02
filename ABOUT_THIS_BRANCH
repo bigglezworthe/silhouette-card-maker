@@ -1,0 +1,34 @@
+refactor/split-utilities
+
+PURPOSE: 
+Split utilities.py into a more manageable collection of files to increase 
+readability as well as identify opportunities for extensibility more easily.
+These files are housed in ./src/ and should not contain any user entry points.
+
+Currently, new code tends to get added to the top of the file, resulting in 
+messy organization. The goal is that new code should be added in 
+src/my_code.py and imported as necessary. 
+
+The goal of this branch is NOT to refactor existing code. 
+Helper functions are being created to remove duplicate code. Names
+are changed to clarify purpose or conform with style guides. Type hints are 
+used as much as possible. Deprecated notation has been modernized. Comments 
+and docstrings are largely removed in favor of self-explaining code.
+
+Notes indicating specific areas for future refactoring efforts are indicated
+by `# [!]`. These are sometimes meandering thoughts or questions. They should 
+be removed prior to the PR. 
+
+DISCLAIMER: 
+I used AI assistance for this. All of the code was typed by hand (even the 
+code directly copied from utilities.py) to help me better understand the
+project as a whole. ChatGPT was primarily used to assist with naming 
+conventions and identifying modernization methods. We had a riveting
+discussion on what to name the Paths class, whether it should even be a 
+class, and what the scope of its content should be. Super exciting stuff.
+
+FUTURE GOALS: 
+- Refactor of utilities.py content
+- Restructure project
+- Create a saved/editable user config
+- Package SCM to run directly from terminal

@@ -4,7 +4,6 @@ import json
 import math
 import filetype
 import os
-import re
 from glob import glob
 from pathlib import Path
 from typing import List, Optional
@@ -15,9 +14,9 @@ from PIL import Image, ImageChops, ImageDraw, ImageFont, ImageOps
 from pydantic import BaseModel
 
 import page_manager
-import src.size_convert as size_convert
+from src import measurements
 from src.enums import FitMode, Registration, Orientation, OrientationMode, Variant
-from src.layouts import load_layout_config
+from src.layouts import load_layout_config, RegistrationSettings
 
 # Specify valid mimetypes for images
 # List can be found here: https://github.com/h2non/filetype.py?tab=readme-ov-file#image
@@ -58,10 +57,57 @@ MINIMUM_BLEED = 15
 #   so that the 10mm studio inset becomes BORDERLESS_INSET_MM on the real sheet.
 #   Formula: each side gains (MIN_REG_INSET_MM - BORDERLESS_INSET_MM), times 2 for both sides.
 _layout_config = load_layout_config()
-BORDERLESS_INSET_MM = size_convert.size_to_mm(_layout_config.defaults.registration.borderless.inset)
+BORDERLESS_INSET_MM = measurements.size_to_mm(_layout_config.defaults.registration.borderless.inset)
 BORDERLESS_EXPANSION_MM = (page_manager.MIN_REG_INSET_MM - BORDERLESS_INSET_MM) * 2
 
+
+def create_template_name(paper_size: str, card_size: str, variant: Variant, version: int) -> str:
+    if variant == Variant.DEFAULT:
+        return f"{paper_size}-{card_size}-v{version}"
+    else:
+        return f"{paper_size}-{card_size}-{variant.value}-v{version}"
+
+def convert_inch_to_crop(crop_in: float, card_width_px: int, card_height_px: int) -> tuple[float, float]:
+    # Card dimensions are based on 300 ppi
+    card_width_in = card_width_px / 300
+    card_height_in = card_height_px / 300
+
+    crop_x_percent = 2 * crop_in / card_width_in * 100
+    crop_y_percent = 2 * crop_in / card_height_in * 100
+
+    return (crop_x_percent, crop_y_percent)
+
+
+def parse_crop_string(crop_string: str | None, card_width: int, card_height: int) -> tuple[float, float]:
+    if crop_string is None:
+        return 0, 0
+
+    valid_units = ["", "mm", "in", "%"]
+    amount, unit = measurements.parse_unit_string(crop_string, valid_units)
+    
+    if unit == "mm":
+        return convert_inch_to_crop(amount / 25.4, card_width, card_height)
+    if unit == "in":
+        return convert_inch_to_crop(amount, card_width, card_height)
+    # Default unit is %
+    return amount, amount
+
+def parse_dimension_string(dimension_string: str | None, ppi: int) -> int:
+    if dimension_string is None:
+        return 0
+
+    valid_units = ["","mm","in","px"]
+    amount, unit = measurements.parse_unit_string(dimension_string, valid_units)
+
+    if unit == "mm":
+        return math.floor(amount / 25.4 * ppi)
+    if unit == "in":
+        return math.floor(amount * ppi)
+    # Default unit is px
+    return int(amount)
+
 # Known junk files across OSes
+# [!] Why delete these? They tend to get recreated anyways.
 EXTRANEOUS_FILES = {
     ".DS_Store",
     "Thumbs.db",
@@ -69,98 +115,7 @@ EXTRANEOUS_FILES = {
     "Icon\r",  # macOS oddball
 }
 
-def parse_crop_string(crop_string: str | None, card_width: int, card_height: int) -> tuple[float, float]:
-    """
-    Calculates crop based on various formats.
-
-    "9" -> (9, 9)
-    "3mm" -> calls function to determine mm crop
-    "3in" -> calls function to determine in crop
-    """
-    if crop_string is None:
-        return 0, 0
-
-    crop_string = crop_string.strip().lower()
-
-    float_pattern = r"(?:\d+\.\d*|\.\d+|\d+)"  # matches 1.0, .5, or 2
-
-    # Match "3mm" or "3.5mm"
-    mm_match = re.fullmatch(rf"({float_pattern})mm", crop_string)
-    if mm_match:
-        crop_mm = float(mm_match.group(1))
-        return convertInToCrop(crop_mm / 25.4, card_width, card_height)
-
-    # Match "0.1in" or "0.125in"
-    in_match = re.fullmatch(rf"({float_pattern})in", crop_string)
-    if in_match:
-        crop_in = float(in_match.group(1))
-        return convertInToCrop(crop_in, card_width, card_height)
-
-    # Match single float like "6.5" or "4.5"
-    single_match = re.fullmatch(float_pattern, crop_string)
-    if single_match:
-        num = float(crop_string)
-        return num, num
-
-    raise ValueError(f"Invalid crop format: '{crop_string}'")
-
-def parse_dimension_string(dimension_string: str | None, ppi: int) -> int:
-    """
-    Parse a dimension string and return the value in pixels.
-
-    Supports the same formats as --crop for consistency:
-    - Physical units: "3mm", "0.125in"
-    - Pixels: "6.5", "10"
-    - Disabled: "0" or None
-
-    Args:
-        dimension_string: String like "3mm", "0.125in", "6.5" (pixels), or "0" to disable
-        ppi: Pixels per inch for the layout
-
-    Returns:
-        Dimension in pixels
-    """
-    if dimension_string is None or dimension_string == "0":
-        return 0
-
-    dimension_string = dimension_string.strip().lower()
-
-    if dimension_string == "0":
-        return 0
-
-    float_pattern = r"(?:\d+\.\d*|\.\d+|\d+)"
-
-    # Match "3mm" or "3.5mm"
-    mm_match = re.fullmatch(rf"({float_pattern})mm", dimension_string)
-    if mm_match:
-        value_mm = float(mm_match.group(1))
-        return math.floor(value_mm / 25.4 * ppi)
-
-    # Match "0.1in" or "0.125in"
-    in_match = re.fullmatch(rf"({float_pattern})in", dimension_string)
-    if in_match:
-        value_in = float(in_match.group(1))
-        return math.floor(value_in * ppi)
-
-    # Match single float like "6.5" or "4.5" (pixels)
-    single_match = re.fullmatch(float_pattern, dimension_string)
-    if single_match:
-        return int(float(dimension_string))
-
-    raise ValueError(f"Invalid dimension format: '{dimension_string}'")
-
-
-def convertInToCrop(crop_in: float, card_width_px: int, card_height_px: int) -> tuple[float, float]:
-    # Convert from pixels to physical mm using DPI
-    # Card dimensions are based on 300 ppi
-    card_width_mm = card_width_px / 300
-    card_height_mm = card_height_px / 300
-
-    crop_x_percent = 2 * crop_in / card_width_mm * 100
-    crop_y_percent = 2 * crop_in / card_height_mm * 100
-
-    return (crop_x_percent, crop_y_percent)
-
+# [!] Probably not worth it. 
 def delete_hidden_files_in_directory(path: str):
     if len(path) > 0:
         for file in os.listdir(path):
@@ -966,13 +921,13 @@ def generate_pdf(
         else:
             effective_inset = lr.inset or layout_config.defaults.registration.default.inset
 
-        template = template_name(paper_size, card_size, variant, version)
+        template = create_template_name(paper_size, card_size, variant, version)
 
     effective_thickness = lr.thickness or default_reg.thickness
     effective_length = lr.length or default_reg.length
 
     # Corner exclusion zone = configured mark length + padding constant
-    total_exclusion_mm = size_convert.size_to_mm(default_reg.length) + page_manager.REG_PADDING_MM
+    total_exclusion_mm = measurements.size_to_mm(default_reg.length) + page_manager.REG_PADDING_MM
     computed = page_manager.generate_layout(
         orientation=orientation,
         card_width=card_size_def.width,
@@ -1008,7 +963,7 @@ def generate_pdf(
 
     # Convert corner radius to pixels for outline drawing
     effective_card_radius = card_size_def.radius or layout_config.defaults.card_radius
-    radius_px = size_convert.size_to_pixel(effective_card_radius, layout_config.ppi)
+    radius_px = measurements.size_to_pixel(effective_card_radius, layout_config.ppi)
 
     num_rows = len(y_pos)
     num_cols = len(x_pos)
@@ -1027,13 +982,13 @@ def generate_pdf(
 
     # If all possible cards are skipped, this may result in an infinite loop
     if len(clean_skip_indices) == num_cards:
-        raise Exception(f'You cannot skip all cards per page')
+        raise Exception('You cannot skip all cards per page')
 
     # The baseline PPI is 300
     ppi_ratio = ppi / 300
 
-    inset_px = size_convert.size_to_pixel(effective_inset, layout_config.ppi)
-    thickness_px = size_convert.size_to_pixel(effective_thickness, layout_config.ppi)
+    inset_px = measurements.size_to_pixel(effective_inset, layout_config.ppi)
+    thickness_px = measurements.size_to_pixel(effective_thickness, layout_config.ppi)
     if borderless:
         # Different margin for borderless because of space constraints
         label_margin_px = math.floor(inset_px * ppi_ratio)

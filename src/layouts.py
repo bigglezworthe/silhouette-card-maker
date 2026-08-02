@@ -189,13 +189,4 @@ def load_layout_config() -> LayoutConfig:
     merge_extra_layouts(raw_config)
     return LayoutConfig(**raw_config)
 
-#============================
-# Misc 
-#============================
-# [!] Not sure this belongs here... 
-def create_template_name(paper_size: str, card_size: str, variant: Variant, version: int) -> str:
-    if variant == Variant.DEFAULT:
-        return f"{paper_size}-{card_size}-v{version}"
-    else:
-        return f"{paper_size}-{card_size}-{variant.value}-v{version}"
 
