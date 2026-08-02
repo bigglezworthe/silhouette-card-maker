@@ -16,31 +16,14 @@ from pydantic import BaseModel
 import page_manager
 from src import measurements
 from src.enums import FitMode, Registration, Orientation, OrientationMode, Variant
-from src.layouts import load_layout_config, RegistrationSettings
-
-# Specify valid mimetypes for images
-# List can be found here: https://github.com/h2non/filetype.py?tab=readme-ov-file#image
-# Pillow suported formats: https://pillow.readthedocs.io/en/stable/handbook/image-file-formats.html
-valid_mimetypes = (
-    # "image/vnd.dwg",
-    # "image/x-xcf",
-    "image/jpeg",
-    "image/jpx",
-    # "image/jxl",
-    "image/png",
-    "image/apng",
-    "image/gif",
-    "image/webp",
-    # "image/x-canon-cr2",
-    "image/tiff",
-    "image/bmp",
-    # "image/vnd.ms-photo",
-    # "image/vnd.adobe.photoshop",
-    # "image/x-icon",
-    # "image/heic",
-    "image/avif",
-    "image/qoi",
-    "image/dds"
+from src.layouts import load_layout_config, RegistrationSettings, CardSizeDef
+from src.crop import crop_and_scale_image 
+from src.paths import (
+        get_directory, 
+        ensure_output_directory_exists,
+        delete_hidden_files_in_directory,
+        get_image_file_paths,
+        get_back_card_image_path,
 )
 
 # Approximately 1.25mm of bleed assuming 300 PPI: ceil(1.25mm * 1in/25.4mm * 300ppi)
@@ -67,31 +50,6 @@ def create_template_name(paper_size: str, card_size: str, variant: Variant, vers
     else:
         return f"{paper_size}-{card_size}-{variant.value}-v{version}"
 
-def convert_inch_to_crop(crop_in: float, card_width_px: int, card_height_px: int) -> tuple[float, float]:
-    # Card dimensions are based on 300 ppi
-    card_width_in = card_width_px / 300
-    card_height_in = card_height_px / 300
-
-    crop_x_percent = 2 * crop_in / card_width_in * 100
-    crop_y_percent = 2 * crop_in / card_height_in * 100
-
-    return (crop_x_percent, crop_y_percent)
-
-
-def parse_crop_string(crop_string: str | None, card_width: int, card_height: int) -> tuple[float, float]:
-    if crop_string is None:
-        return 0, 0
-
-    valid_units = ["", "mm", "in", "%"]
-    amount, unit = measurements.parse_unit_string(crop_string, valid_units)
-    
-    if unit == "mm":
-        return convert_inch_to_crop(amount / 25.4, card_width, card_height)
-    if unit == "in":
-        return convert_inch_to_crop(amount, card_width, card_height)
-    # Default unit is %
-    return amount, amount
-
 def parse_dimension_string(dimension_string: str | None, ppi: int) -> int:
     if dimension_string is None:
         return 0
@@ -105,202 +63,6 @@ def parse_dimension_string(dimension_string: str | None, ppi: int) -> int:
         return math.floor(amount * ppi)
     # Default unit is px
     return int(amount)
-
-# Known junk files across OSes
-# [!] Why delete these? They tend to get recreated anyways.
-EXTRANEOUS_FILES = {
-    ".DS_Store",
-    "Thumbs.db",
-    "desktop.ini",
-    "Icon\r",  # macOS oddball
-}
-
-# [!] Probably not worth it. 
-def delete_hidden_files_in_directory(path: str):
-    if len(path) > 0:
-        for file in os.listdir(path):
-            full_path = os.path.join(path, file)
-            if os.path.isfile(full_path) and (file in EXTRANEOUS_FILES or file.startswith("._")):
-                try:
-                    os.remove(full_path)
-                    print(f"Removed hidden file: {full_path}")
-                except OSError as e:
-                    print(f"Could not remove {full_path}: {e}")
-
-def get_directory(path):
-    if os.path.isdir(path):
-        return os.path.abspath(path)
-    else:
-        return os.path.abspath(os.path.dirname(path))
-
-def ensure_directory(path: str) -> str:
-    """Create directory and any missing parent directories. Returns the path."""
-    os.makedirs(path, exist_ok=True)
-    return path
-
-def ensure_output_directory(output_path: str) -> None:
-    """Create the parent directory of output_path if it doesn't exist."""
-    parent = os.path.dirname(os.path.abspath(output_path))
-    if parent:
-        os.makedirs(parent, exist_ok=True)
-
-def get_image_file_paths(dir_path: str) -> List[str]:
-    result = []
-
-    for current_folder, _, files in os.walk(dir_path):
-        for filename in files:
-            full_path = os.path.join(current_folder, filename)
-
-            # Skip invalid files
-            if filetype.guess_mime(full_path) not in valid_mimetypes:
-                continue
-
-            relative_path = os.path.relpath(full_path, dir_path)
-            result.append(relative_path)
-
-    return result
-
-def get_back_card_image_path(back_dir_path) -> str | None:
-    # List all files in the directory that are pngs and jpegs
-    # The directory may contain markdown and/or other files
-    files = [f for f in Path(back_dir_path).glob("*") if f.is_file() and filetype.guess_mime(f) in valid_mimetypes]
-
-    if len(files) == 0:
-        return None
-
-    if len(files) == 1:
-        return files[0]
-
-    # Multiple back files detected, provide a selection menu
-    print("[0] No back image")
-    for i, f in enumerate(files):
-        print(f'[{i + 1}] {f}')
-
-    while True:
-        choice = input("Select a back image (enter the number): ")
-
-        if not choice.isdigit():
-            continue
-
-        index = int(choice) - 1
-        if index == -1:
-            return None
-        if index >= 0 and index < len(files):
-            break
-
-    return files[index]
-
-def crop_and_scale_image(
-    card_image: Image.Image,
-    crop_percent_x: float,
-    crop_percent_y: float,
-    scaled_width: int,
-    scaled_height: int,
-    scaled_bleed_width: int,
-    scaled_bleed_height: int,
-    fit: FitMode = FitMode.STRETCH
-) -> tuple[Image.Image, int, int, tuple[int, int]]:
-    """
-    Crop and scale a card image, returning the processed image and bleed offsets.
-
-    When fit == STRETCH (default), each axis scales independently.
-    When fit == CROP, a uniform scale ratio is used (preserving aspect ratio),
-    and excess image data on the non-limiting axis is used for real bleed.
-
-    Returns:
-        tuple of:
-        - processed_image: The cropped and scaled card image
-        - bleed_offset_x: X position adjustment when bleed is included in image (negative or 0)
-        - bleed_offset_y: Y position adjustment when bleed is included in image (negative or 0)
-        - synthetic_bleed: (width, height) of bleed to generate artificially, (0, 0) if real bleed was used
-    """
-    card_width, card_height = card_image.size
-
-    # Calculate the original size minus the desired crop: "cropped size"
-    cropped_width = math.floor(card_width * (1 - (crop_percent_x / 100)))
-    cropped_height = math.floor(card_height * (1 - (crop_percent_y / 100)))
-
-    # Calculate the ratio between the cropped size and the scaled size: "scale ratio"
-    if fit == FitMode.CROP:
-        # Uniform scaling: use the smaller ratio (the tighter-fitting axis) so that
-        # the image fills the entire target area. The other axis has excess image
-        # data that gets cropped away or used as real bleed.
-        uniform_ratio = min(cropped_width / scaled_width, cropped_height / scaled_height)
-        cropped_scaled_ratio_x = uniform_ratio
-        cropped_scaled_ratio_y = uniform_ratio
-    else:
-        cropped_scaled_ratio_x = cropped_width / scaled_width
-        cropped_scaled_ratio_y = cropped_height / scaled_height
-
-    # Calculate the size of the card after adding bleed: "bleed size"
-    scaled_width_with_bleed = scaled_width + 2 * scaled_bleed_width
-    scaled_height_with_bleed = scaled_height + 2 * scaled_bleed_height
-
-    # Calculate the size of the card after adding bleed, but before scaling: "unscaled bleed size"
-    unscaled_width_with_bleed = math.floor(scaled_width_with_bleed * cropped_scaled_ratio_x)
-    unscaled_height_with_bleed = math.floor(scaled_height_with_bleed * cropped_scaled_ratio_y)
-
-    can_bleed_x = unscaled_width_with_bleed <= card_width
-    can_bleed_y = unscaled_height_with_bleed <= card_height
-
-    # Check if the unscaled bleed size is smaller than the original card size
-    # If so, we can use real bleed from the card's edge pixels
-    if can_bleed_x and can_bleed_y:
-        crop_x = (card_width - unscaled_width_with_bleed) // 2
-        crop_y = (card_height - unscaled_height_with_bleed) // 2
-        card_image = card_image.crop((
-            crop_x,
-            crop_y,
-            card_width - crop_x,
-            card_height - crop_y,
-        ))
-        card_image = card_image.resize((scaled_width_with_bleed, scaled_height_with_bleed))
-
-        # Offset position to account for bleed included in image
-        return card_image, -scaled_bleed_width, -scaled_bleed_height, (0, 0)
-
-    # Per-axis bleed paths (CROP mode only — uniform ratio guarantees no distortion)
-    if fit == FitMode.CROP:
-        if can_bleed_x:
-            # Real bleed on X, synthetic on Y
-            content_height = min(math.floor(scaled_height * cropped_scaled_ratio_y), card_height)
-            crop_x = (card_width - unscaled_width_with_bleed) // 2
-            crop_y = (card_height - content_height) // 2
-            card_image = card_image.crop((crop_x, crop_y, card_width - crop_x, card_height - crop_y))
-            card_image = card_image.resize((scaled_width_with_bleed, scaled_height))
-            return card_image, -scaled_bleed_width, 0, (0, scaled_bleed_height)
-
-        if can_bleed_y:
-            # Synthetic on X, real bleed on Y
-            content_width = min(math.floor(scaled_width * cropped_scaled_ratio_x), card_width)
-            crop_x = (card_width - content_width) // 2
-            crop_y = (card_height - unscaled_height_with_bleed) // 2
-            card_image = card_image.crop((crop_x, crop_y, card_width - crop_x, card_height - crop_y))
-            card_image = card_image.resize((scaled_width, scaled_height_with_bleed))
-            return card_image, 0, -scaled_bleed_height, (scaled_bleed_width, 0)
-
-        # Neither axis has room for real bleed — center-crop to content area
-        content_width = min(math.floor(scaled_width * cropped_scaled_ratio_x), card_width)
-        content_height = min(math.floor(scaled_height * cropped_scaled_ratio_y), card_height)
-        crop_x = (card_width - content_width) // 2
-        crop_y = (card_height - content_height) // 2
-        card_image = card_image.crop((crop_x, crop_y, card_width - crop_x, card_height - crop_y))
-        card_image = card_image.resize((scaled_width, scaled_height))
-        return card_image, 0, 0, (scaled_bleed_width, scaled_bleed_height)
-
-    # STRETCH fallback: crop the card to the cropped size, then resize it to the scaled size
-    crop_x = card_width * (crop_percent_x / 100) // 2
-    crop_y = card_height * (crop_percent_y / 100) // 2
-    card_image = card_image.crop((
-        crop_x,
-        crop_y,
-        card_width - crop_x,
-        card_height - crop_y,
-    ))
-    card_image = card_image.resize((scaled_width, scaled_height))
-
-    return card_image, 0, 0, (scaled_bleed_width, scaled_bleed_height)
-
 
 def fill_rounded_corners(card_image: Image.Image, corner_radius: int) -> Image.Image:
     """
@@ -790,18 +552,20 @@ def generate_pdf(
     if not ds_path.exists() or not ds_path.is_dir():
         raise Exception(f'Double-sided image directory path "{ds_path}" is invalid.')
 
+    o_path = Path(output_path)
+
     # Delete hidden files that may affect image fetching
-    delete_hidden_files_in_directory(front_dir_path)
-    delete_hidden_files_in_directory(back_dir_path)
-    delete_hidden_files_in_directory(ds_dir_path)
+    delete_hidden_files_in_directory(f_path)
+    delete_hidden_files_in_directory(b_path)
+    delete_hidden_files_in_directory(ds_path)
 
     # Sanity check for output images
     if output_images:
-        output_path = get_directory(output_path)
+        o_path = get_directory(o_path)
     else:
-        if not output_path.lower().endswith(".pdf"):
-            raise Exception(f'Cannot save PDF to output path "{output_path}" because it is not a valid PDF file path.')
-        ensure_output_directory(output_path)
+        if not o_path.name.lower().endswith(".pdf"):
+            raise Exception(f'Cannot save PDF to output path "{o_path}" because it is not a valid PDF file path.')
+        ensure_output_directory_exists(o_path)
 
     # Get the back image, if it exists
     back_card_image_path = None

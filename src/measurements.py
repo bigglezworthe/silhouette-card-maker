@@ -1,3 +1,8 @@
+#==============================================================================
+# measurements.py 
+#     Value + Unit string parsing and unit conversion. 
+#==============================================================================
+
 import re
 
 MM_PER_INCH = 25.4
@@ -24,7 +29,7 @@ def parse_unit_string(unit_string: str | None, valid_units: list[str]) -> tuple[
 
     return float(amount), unit
 
-def size_to_mm(size_string: str) -> float:
+def size_to_mm(size_string: str | None) -> float:
     valid_units = ["","in","mm"]
     amount, unit = parse_unit_string(size_string, valid_units)
 
@@ -35,13 +40,13 @@ def size_to_mm(size_string: str) -> float:
     return amount
 
 
-def size_to_in(size_string: str) -> float:
+def size_to_in(size_string: str | None) -> float:
     return size_to_mm(size_string) / MM_PER_INCH
 
 
-def size_to_pt(size_string: str) -> float:
+def size_to_pt(size_string: str | None) -> float:
     return size_to_in(size_string) * PT_PER_INCH
 
 
-def size_to_pixel(size_string: str, ppi: int) -> int:
+def size_to_pixel(size_string: str | None, ppi: int) -> int:
     return round(size_to_in(size_string) * ppi)

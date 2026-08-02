@@ -1,9 +1,14 @@
+#==============================================================================
+# layouts.py 
+#     Handles the card/page layout system for all card/paper types. 
+#==============================================================================
+
 import json
 import os 
 
-from src.size_convert import size_to_mm
+from src.measurements import size_to_mm
 from src.paths import Paths
-from src.enums import Orientation, Variant
+from src.enums import Orientation
 from src.utils import biased_sort
 
 from typing import Any 
@@ -28,11 +33,10 @@ EXTRA_LAYOUTS_ENV = 'SCM_EXTRA_LAYOUTS'
 # cutting_templates/ directories in generate_dxf.py and dxf_to_studio3.py).
 CUTTING_TEMPLATES_DIR_ENV = 'SCM_CUTTING_TEMPLATES_DIR'
 
-
 #============================
 # Classes 
 #============================
-# [!]This whole thing is setting up structure to properly import the JSON. 
+# These classes set up structure to properly import the JSONs. 
 
 class RegistrationSettings(BaseModel):
     inset: str | None = None
@@ -117,6 +121,7 @@ def find_extra_layout_owner(section: str, key: str) -> Path | None:
             if key in json.load(f).get(section, {}):
                 return path
     return None 
+
 # [!] Need to figure out a solution for these type warnings. Should be able to use SpecialtyLayoutDef
 def merge_extra_layouts(raw_config: dict[str, Any]) -> dict[str, Any]:
     for path in extra_layout_paths():
