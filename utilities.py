@@ -1,17 +1,12 @@
 from enum import Enum
 import itertools
-import json
 import math
-import filetype
 import os
-from glob import glob
 from pathlib import Path
 from typing import List, Optional
-from xml.dom import ValidationErr
 
 from natsort import natsorted
 from PIL import Image, ImageChops, ImageDraw, ImageFont, ImageOps
-from pydantic import BaseModel
 
 import page_manager
 from src import measurements
@@ -24,7 +19,10 @@ from src.paths import (
         delete_hidden_files_in_directory,
         get_image_file_paths,
         get_back_card_image_path,
+        check_paths_subset,
+        resolve_image_with_any_extension,
 )
+from src.offset import load_saved_offset
 
 # Approximately 1.25mm of bleed assuming 300 PPI: ceil(1.25mm * 1in/25.4mm * 300ppi)
 MINIMUM_BLEED = 15
@@ -402,39 +400,6 @@ def add_front_back_pages(front_page: Image.Image, back_page: Image.Image, pages:
     pages.append(front_page)
     if not only_fronts:
         pages.append(back_page)
-
-def check_paths_subset(subset: set[str], mainset: set[str]) -> set[str]:
-    """Return the items in `subset` whose basenames do NOT appear in `mainset`,
-    ignoring extensions."""
-    subset_stems = {Path(p).stem: p for p in subset}
-    mainset_stems = {Path(p).stem for p in mainset}
-
-    return {orig for stem, orig in subset_stems.items() if stem not in mainset_stems}
-
-def resolve_image_with_any_extension(path: str) -> str:
-    """
-    If the exact path exists, return it.
-    Otherwise search for files with the same stem (basename)
-    but any extension. Returns the resolved path or raises.
-    """
-    p = Path(path)
-
-    # Case 1: exact file exists
-    if p.exists():
-        return str(p)
-
-    # Case 2: try to find any file with the same stem
-    pattern = str(p.with_suffix('')) + ".*"   # e.g. "card1.*"
-    matches = glob(pattern)
-
-    if len(matches) == 0:
-        raise FileNotFoundError(f"Missing image: {pattern}")
-
-    if len(matches) > 1:
-        raise ValueError(f"Ambiguous image match: {matches}")
-
-    return matches[0]
-
 
 def find_best_orientation(
     orientation_mode: OrientationMode,
@@ -961,36 +926,6 @@ def generate_pdf(
             pages[0].save(output_path, format='PDF', save_all=True, append_images=pages[1:], resolution=math.floor(300 * ppi_ratio), speed=0, subsampling=0, quality=quality)
             print(f'Generated PDF: {output_path}')
 
-
-class OffsetData(BaseModel):
-    x_offset: int
-    y_offset: int
-    angle_offset: float = 0.0
-
-def save_offset(x_offset: int, y_offset: int, angle_offset: float = 0.0) -> None:
-    # Create the directory if it doesn't exist
-    os.makedirs('data', exist_ok=True)
-
-    # Save the offset data to a JSON file
-    with open('data/offset_data.json', 'w') as offset_file:
-        offset_file.write(OffsetData(x_offset=x_offset, y_offset=y_offset, angle_offset=angle_offset).model_dump_json(indent=4))
-
-    print('Offset data saved!')
-
-def load_saved_offset() -> OffsetData:
-    if os.path.exists('data/offset_data.json'):
-        with open('data/offset_data.json', 'r') as offset_file:
-            try:
-                data = json.load(offset_file)
-                return OffsetData(**data)
-
-            except json.JSONDecodeError as e:
-                print(f'Cannot decode offset JSON: {e}')
-
-            except ValidationErr as e:
-                print(f'Cannot validate offset data: {e}.')
-
-    return None
 
 def offset_images(images: List[Image.Image], x_offset: int, y_offset: int, ppi: int, angle_offset: float = 0.0) -> List[Image.Image]:
     result_images = []

@@ -20,6 +20,12 @@ class Paths:
     doubles: Path = game / 'double-sided'
     output: Path = game / 'output'
 
+def check_paths_subset(subset: set[str], mainset: set[str]) -> set[str]:
+    subset_stems = {Path(p).stem: p for p in subset}
+    mainset_stems = {Path(p).stem for p in mainset}
+
+    return {orig for stem, orig in subset_stems.items() if stem not in mainset_stems}
+
 #============================
 # Functions below this point been Pathified. 
 #============================
@@ -124,3 +130,19 @@ def get_back_card_image_path(back_dir_path: str | Path) -> Path | None:
             break
 
     return files[index]
+
+def resolve_image_with_any_extension(path: str) -> str:
+    p = Path(path)
+
+    if p.is_file():
+        return str(p)
+
+    pattern = f"{p.stem}.*"
+    matches = list(p.parent.glob(pattern))
+
+    if len(matches) == 0:
+        raise FileNotFoundError(f"Missing image: {pattern}")
+    if len(matches) > 1:
+        raise ValueError(f"Ambiguous image match: {matches}")
+
+    return str(matches[0])

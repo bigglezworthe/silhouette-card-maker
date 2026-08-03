@@ -2,7 +2,8 @@ import os
 import click
 import pypdfium2 as pdfium
 
-from utilities import load_saved_offset, offset_images, save_offset
+from utilities import offset_images
+from src.offset import save_offset, load_saved_offset
 
 output_directory = os.path.join('game', 'output')
 default_output_pdf_path = os.path.join(output_directory, 'game.pdf')
@@ -16,7 +17,16 @@ default_output_pdf_path = os.path.join(output_directory, 'game.pdf')
 @click.option("-s", "--save", default=False, is_flag=True, help="Save offset values.")
 @click.option("--ppi", default=300, type=click.IntRange(min=0), show_default=True, help="Pixels per inch (PPI) when generating offset PDF.")
 
-def offset_pdf(pdf_path, output_pdf_path, x_offset, y_offset, angle, save, ppi):
+def offset_pdf(
+        pdf_path: str, 
+        output_pdf_path: str | None, 
+        x_offset: int | None, 
+        y_offset: int | None,
+        angle: float | None, 
+        save: bool, 
+        ppi: int
+) -> None:
+
     new_x_offset = 0
     new_y_offset = 0
     new_angle_offset = 0.0
@@ -44,7 +54,7 @@ def offset_pdf(pdf_path, output_pdf_path, x_offset, y_offset, angle, save, ppi):
     # Save new offset
     if save:
         save_offset(new_x_offset, new_y_offset, new_angle_offset)
-        print(f'Saved offset')
+        print('Saved offset')
 
     try:
         pdf = pdfium.PdfDocument(pdf_path)
