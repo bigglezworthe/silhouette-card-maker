@@ -1,4 +1,3 @@
-from enum import Enum
 import itertools
 import math
 import os
@@ -6,13 +5,12 @@ from pathlib import Path
 from typing import List, Optional
 
 from natsort import natsorted
-from PIL import Image, ImageChops, ImageDraw, ImageFont, ImageOps
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 import page_manager
 from src import measurements
 from src.enums import FitMode, Registration, Orientation, OrientationMode, Variant
-from src.layouts import load_layout_config, RegistrationSettings, CardSizeDef
-from src.crop import crop_and_scale_image 
+from src.layouts import load_layout_config, RegistrationSettings, CardSizeDef, PaperSizeDef 
 from src.paths import (
         get_directory, 
         ensure_output_directory_exists,
@@ -22,10 +20,12 @@ from src.paths import (
         check_paths_subset,
         resolve_image_with_any_extension,
 )
-from src.offset import load_saved_offset
+from src.offset import load_saved_offset, offset_images
+from src.images import calculate_max_print_bleed
+from src.paths import Paths
+from src.draw import draw_card_layout, draw_outline
 
 # Approximately 1.25mm of bleed assuming 300 PPI: ceil(1.25mm * 1in/25.4mm * 300ppi)
-MINIMUM_BLEED = 15
 
 
 # Borderless mode tricks Silhouette Studio into using a smaller effective inset than its
@@ -62,307 +62,9 @@ def parse_dimension_string(dimension_string: str | None, ppi: int) -> int:
     # Default unit is px
     return int(amount)
 
-def fill_rounded_corners(card_image: Image.Image, corner_radius: int) -> Image.Image:
-    """
-    Fill the rounded corner regions of a card image with bleed.
-
-    Assumes the card has rounded corners with the specified radius.
-    Pixels in the "cut zone" (outside the corner radius arc) are filled
-    by extending from the nearest pixel on the arc.
-
-    Args:
-        card_image: The card image to modify
-        corner_radius: The radius of the rounded corners in pixels
-
-    Returns:
-        A new image with filled corners
-    """
-    import math
-
-    # Create a copy so we don't modify the original
-    result = card_image.copy()
-    width, height = result.size
-
-    # Define the four corners: (corner_point, center_of_arc)
-    corners = [
-        ((0, 0), (corner_radius, corner_radius)),  # top-left
-        ((width, 0), (width - corner_radius, corner_radius)),  # top-right
-        ((0, height), (corner_radius, height - corner_radius)),  # bottom-left
-        ((width, height), (width - corner_radius, height - corner_radius)),  # bottom-right
-    ]
-
-    for (corner_x, corner_y), (arc_cx, arc_cy) in corners:
-        # Each rounded corner has a square region of size (corner_radius x corner_radius)
-        # that contains both the rounded arc and the "cut zone" beyond it
-        square_x_start = 0 if corner_x == 0 else width - corner_radius
-        square_y_start = 0 if corner_y == 0 else height - corner_radius
-        square_x_end = corner_radius if corner_x == 0 else width
-        square_y_end = corner_radius if corner_y == 0 else height
-
-        # Process each pixel in this corner's square
-        for local_x in range(square_x_start, square_x_end):
-            for local_y in range(square_y_start, square_y_end):
-                # Calculate distance from this pixel to the arc's center point
-                dist = math.sqrt((local_x - arc_cx) ** 2 + (local_y - arc_cy) ** 2)
-
-                # Pixels beyond the corner_radius are in the "cut zone" - the area that
-                # will be removed when the card is die-cut with rounded corners
-                if dist > corner_radius:
-                    # Use polar coordinates to find the nearest point on the arc:
-                    # 1. Calculate the angle from the arc center to this cut-zone pixel
-                    angle = math.atan2(local_y - arc_cy, local_x - arc_cx)
-
-                    # 2. Project that angle onto the arc at exactly corner_radius distance
-                    # This gives us the nearest "good" pixel on the rounded corner edge
-                    src_x = int(arc_cx + corner_radius * math.cos(angle))
-                    src_y = int(arc_cy + corner_radius * math.sin(angle))
-
-                    # Clamp to image bounds for safety
-                    src_x = max(0, min(width - 1, src_x))
-                    src_y = max(0, min(height - 1, src_y))
-
-                    # Copy the arc pixel into the cut zone, extending the card image
-                    # radially outward to fill what would otherwise be white corners
-                    try:
-                        pixel = result.getpixel((src_x, src_y))
-                        result.putpixel((local_x, local_y), pixel)
-                    except (IndexError, ValueError):
-                        pass
-
-    return result
-
-
-def draw_card_with_bleed(
-    card_image: Image.Image,
-    base_image: Image.Image,
-    x: int,
-    y: int,
-    print_bleed: tuple[int, int],
-    extra_bleed: tuple[int, int, int, int] = (0, 0, 0, 0)
-):
-    """
-    Draw a card with bleed on all edges.
-
-    Args:
-        card_image: The card image to draw
-        base_image: The base image to draw on
-        x, y: Position to place the card
-        print_bleed: Tuple of (bleed_width, bleed_height) in pixels
-        extra_bleed: Additional bleed for outer edges (top, right, bottom, left) in pixels
-    """
-    bleed_width, bleed_height = print_bleed
-    extra_top, extra_right, extra_bottom, extra_left = extra_bleed
-
-    # Calculate total bleed for each edge
-    bleed_top = bleed_height + extra_top
-    bleed_bottom = bleed_height + extra_bottom
-    bleed_left = bleed_width + extra_left
-    bleed_right = bleed_width + extra_right
-
-    width, height = card_image.size
-    base_image.paste(card_image, (x, y))
-
-    class Axis(int, Enum):
-        X = 0
-        Y = 1
-
-    def extend_edge(crop_box: tuple[int, int, int, int], start: tuple[int, int], bleed: int, axis: Axis):
-        for bleed_i in range(bleed):
-            pos = (
-                start[0] + (bleed_i if axis == Axis.X else 0),
-                start[1] + (bleed_i if axis == Axis.Y else 0)
-            )
-            base_image.paste(card_image.crop(crop_box), pos)
-
-    def fill_corner(corner_pixel_x: int, corner_pixel_y: int,
-                    corner_x: int, corner_y: int,
-                    width: int, height: int):
-        """Fill a corner bleed region by tiling a single pixel."""
-        pixel = card_image.crop((corner_pixel_x, corner_pixel_y, corner_pixel_x + 1, corner_pixel_y + 1))
-        for dx in range(width):
-            for dy in range(height):
-                base_image.paste(pixel, (corner_x + dx, corner_y + dy))
-
-    # Extend the edges of the cards to create print bleed
-    # Top and bottom
-    extend_edge((0, 0, width, 1), (x, y - bleed_top), bleed_top, Axis.Y)
-    extend_edge((0, height - 1, width, height), (x, y + height), bleed_bottom, Axis.Y)
-
-    # Left and right
-    extend_edge((0, 0, 1, height), (x - bleed_left, y), bleed_left, Axis.X)
-    extend_edge((width - 1, 0, width, height), (x + width, y), bleed_right, Axis.X)
-
-    # Fill four corners with tiled pixels from card corners
-    fill_corner(0, 0, x - bleed_left, y - bleed_top, bleed_left, bleed_top)  # Top-left
-    fill_corner(width - 1, 0, x + width, y - bleed_top, bleed_right, bleed_top)  # Top-right
-    fill_corner(0, height - 1, x - bleed_left, y + height, bleed_left, bleed_bottom)  # Bottom-left
-    fill_corner(width - 1, height - 1, x + width, y + height, bleed_right, bleed_bottom)  # Bottom-right
-
-    return base_image
-
-def draw_card_layout(
-    card_images: List[Image.Image | None],
-    single_back_image: Image.Image,
-    base_image: Image.Image,
-    num_rows: int,
-    num_cols: int,
-    x_pos: List[int],
-    y_pos: List[int],
-    width: int,
-    height: int,
-    print_bleed: tuple[int, int],
-    crop: tuple[float, float],
-    crop_backs: tuple[float, float],
-    ppi_ratio: float,
-    extend_edges: int,
-    extend_edges_backs: int,
-    extend_corners_radius: int,
-    extend_corners_backs_radius: int,
-    extend_bleed: int,
-    flip: bool,
-    fit: FitMode,
-    fit_backs: FitMode,
-    orientation: Orientation
-):
-    num_cards = num_rows * num_cols
-    crop_percent_x, crop_percent_y = crop
-    crop_backs_percent_x, crop_backs_percent_y = crop_backs
-
-    extend_edges_thickness = math.floor(extend_edges * ppi_ratio)
-    extend_edges_backs_thickness = math.floor(extend_edges_backs * ppi_ratio)
-    extend_corners_thickness = math.floor(extend_corners_radius * ppi_ratio)
-    extend_corners_backs_thickness = math.floor(extend_corners_backs_radius * ppi_ratio)
-    extend_bleed_thickness = math.floor(extend_bleed * ppi_ratio)
-
-    # Calculate the size of the card after scaling: "scaled size"
-    scaled_width = math.floor(width * ppi_ratio)
-    scaled_height = math.floor(height * ppi_ratio)
-
-    scaled_bleed_width = math.ceil(print_bleed[0] * ppi_ratio)
-    scaled_bleed_height = math.ceil(print_bleed[1] * ppi_ratio)
-
-    # Fill all the spaces with the card back
-    for i, card_image in enumerate(card_images):
-        if card_image is None:
-            continue
-
-        # Calculate base position from layout
-        col = i % num_cards % num_cols
-        row = (i % num_cards) // num_cols
-        # Long-side flip: landscape flips rows, portrait flips columns
-        if flip:
-            if orientation == Orientation.PORTRAIT:
-                col = num_cols - col - 1
-            else:
-                row = num_rows - row - 1
-
-        base_x = math.floor(x_pos[col] * ppi_ratio)
-        base_y = math.floor(y_pos[row] * ppi_ratio)
-
-        # Default: use synthetic bleed, no position offset needed
-        bleed_offset_x = 0
-        bleed_offset_y = 0
-        synthetic_bleed = (scaled_bleed_width, scaled_bleed_height)
-
-        # Select parameters based on card type (front vs back).
-        # Renaming to active_* allows us to use a single processing path below
-        # instead of duplicating the entire image processing logic for fronts and backs.
-        if card_image is single_back_image:
-            active_crop_x, active_crop_y = crop_backs_percent_x, crop_backs_percent_y
-            active_fit = fit_backs
-            active_extend_edges_thickness = extend_edges_backs_thickness
-            active_extend_corners_thickness = extend_corners_backs_thickness
-        else:
-            active_crop_x, active_crop_y = crop_percent_x, crop_percent_y
-            active_fit = fit
-            active_extend_edges_thickness = extend_edges_thickness
-            active_extend_corners_thickness = extend_corners_thickness
-
-        # Apply cropping, scaling, and fit mode
-        if active_crop_x > 0 or active_crop_y > 0 or active_fit == FitMode.CROP:
-            card_image, bleed_offset_x, bleed_offset_y, synthetic_bleed = crop_and_scale_image(
-                card_image,
-                active_crop_x,
-                active_crop_y,
-                scaled_width,
-                scaled_height,
-                scaled_bleed_width,
-                scaled_bleed_height,
-                active_fit
-            )
-        else:
-            # No percentage crop and STRETCH mode: just scale to target size
-            card_image = card_image.resize((scaled_width, scaled_height))
-
-        # Apply extend_edges: simple crop that affects all edges uniformly
-        if active_extend_edges_thickness > 0:
-            card_image = card_image.crop((
-                active_extend_edges_thickness,
-                active_extend_edges_thickness,
-                card_image.width - active_extend_edges_thickness,
-                card_image.height - active_extend_edges_thickness
-            ))
-
-        # If extend_corners is specified, fill the corner regions FIRST
-        # This modifies the card image so the bleed will be generated from the filled corners
-        if active_extend_corners_thickness > 0:
-            card_image = fill_rounded_corners(card_image, active_extend_corners_thickness)
-
-        if flip and orientation == Orientation.LANDSCAPE:
-            card_image = card_image.rotate(180)
-
-        # Calculate final position
-        x = base_x + bleed_offset_x + active_extend_edges_thickness
-        y = base_y + bleed_offset_y + active_extend_edges_thickness
-
-        # Calculate total bleed including synthetic bleed and edge extension
-        edge_bleed_width = synthetic_bleed[0] + active_extend_edges_thickness
-        edge_bleed_height = synthetic_bleed[1] + active_extend_edges_thickness
-
-        # Determine if this card is on an outer edge and should have extended bleed
-        # extra_bleed format: (top, right, bottom, left)
-        extra_bleed_top = extend_bleed_thickness if row == 0 else 0
-        extra_bleed_bottom = extend_bleed_thickness if row == num_rows - 1 else 0
-        extra_bleed_left = extend_bleed_thickness if col == 0 else 0
-        extra_bleed_right = extend_bleed_thickness if col == num_cols - 1 else 0
-
-        # Generate edge bleed (from the modified card if corners were filled)
-        draw_card_with_bleed(
-            card_image,
-            base_image,
-            x,
-            y,
-            (edge_bleed_width, edge_bleed_height),
-            (extra_bleed_top, extra_bleed_right, extra_bleed_bottom, extra_bleed_left)
-        )
-
-def draw_outline(
-    page: Image.Image,
-    x_pos: List[int],
-    y_pos: List[int],
-    card_width_px: int,
-    card_height_px: int,
-    radius_px: int,
-    ppi_ratio: float,
-):
-    draw = ImageDraw.Draw(page)
-    scaled_w = math.floor(card_width_px * ppi_ratio)
-    scaled_h = math.floor(card_height_px * ppi_ratio)
-    scaled_r = math.floor(radius_px * ppi_ratio)
-
-    for x in x_pos:
-        for y in y_pos:
-            sx = math.floor(x * ppi_ratio)
-            sy = math.floor(y * ppi_ratio)
-            draw.rounded_rectangle(
-                [sx, sy, sx + scaled_w, sy + scaled_h],
-                radius=scaled_r,
-                outline='white',
-                width=1,
-            )
 
 def add_front_back_pages(front_page: Image.Image, back_page: Image.Image, pages: List[Image.Image], page_width: int, page_height: int, ppi_ratio: float, template: str, only_fronts: bool, label: str, orientation: Orientation, label_margin_px: int, borderless: bool):
-    font = ImageFont.truetype(os.path.join(asset_directory, 'arial.ttf'), 40 * ppi_ratio)
+    font = ImageFont.truetype(os.path.join(Paths.assets, 'arial.ttf'), 40 * ppi_ratio)
 
     num_sheet = len(pages) + 1
     if not only_fronts:
@@ -749,7 +451,7 @@ def generate_pdf(
         # Create the array that will store the filled templates
         pages: List[Image.Image] = []
 
-        max_print_bleed = calculate_max_print_bleed(x_pos, y_pos, card_width_px, card_height_px, MINIMUM_BLEED)
+        max_print_bleed = calculate_max_print_bleed(x_pos, y_pos, card_width_px, card_height_px)
 
         # Load and cache the single back image for reuse
         # Do this if we expect both front and back pages and if we have a back image
@@ -926,49 +628,3 @@ def generate_pdf(
             pages[0].save(output_path, format='PDF', save_all=True, append_images=pages[1:], resolution=math.floor(300 * ppi_ratio), speed=0, subsampling=0, quality=quality)
             print(f'Generated PDF: {output_path}')
 
-
-def offset_images(images: List[Image.Image], x_offset: int, y_offset: int, ppi: int, angle_offset: float = 0.0) -> List[Image.Image]:
-    result_images = []
-
-    add_offset = False
-    for image in images:
-        if add_offset:
-            # The back page is rotated 180° in the PDF (long-side flip).
-            # In orientation-relative terms: +X = right, -X = left, +Y = up, -Y = down.
-            # Negating x_offset compensates for the 180° x-axis flip.
-            result = ImageChops.offset(image, math.floor(-x_offset * ppi / 300), math.floor(y_offset * ppi / 300))
-            # Apply angle rotation if specified
-            # Negative angle because PIL rotates counter-clockwise, but we want positive = clockwise
-            if angle_offset != 0.0:
-                result = result.rotate(-angle_offset, center=(image.width / 2, image.height / 2), fillcolor='white')
-            result_images.append(result)
-        else:
-            result_images.append(image)
-
-        add_offset = not add_offset
-
-    return result_images
-
-def calculate_max_print_bleed(x_pos: List[int], y_pos: List[int], width: int, height: int, min_bleed: int = 0) -> tuple[int, int]:
-    if len(x_pos) == 1 and len(y_pos) == 1:
-        return (min_bleed, min_bleed)
-
-    x_border_max = min_bleed
-    if len(x_pos) >= 2:
-        x_pos.sort()
-
-        x_pos_0 = x_pos[0]
-        x_pos_1 = x_pos[1]
-
-        x_border_max = max(0, math.ceil((x_pos_1 - x_pos_0 - width) / 2))
-
-    y_border_max = min_bleed
-    if len(y_pos) >= 2:
-        y_pos.sort()
-
-        y_pos_0 = y_pos[0]
-        y_pos_1 = y_pos[1]
-
-        y_border_max = max(0, math.ceil((y_pos_1 - y_pos_0 - height) / 2))
-
-    return (x_border_max, y_border_max)

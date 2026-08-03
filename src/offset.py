@@ -5,11 +5,13 @@
 
 import os
 import json 
+import math
 
 from pydantic import BaseModel
 from .paths import Paths
 
 from xml.dom import ValidationErr
+from PIL import Image, ImageChops 
 
 DATA_PATH = Paths.root / "data"
 OFFSET_DATA_PATH = DATA_PATH / "offset_data.json"
@@ -42,6 +44,35 @@ def load_saved_offset() -> OffsetData | None:
             print(f"Cannot validate offset data: {e}")
 
     return None
+
+def offset_images(
+    images: list[Image.Image],
+    x_offset: int,
+    y_offset: int,
+    ppi: int,
+    angle_offset: float = 0.0,
+) -> list[Image.Image]:
+    result_images: list[Image.Image] = []
+     
+    # Only add offset to back images and account for orientation flip 
+    add_offset = False
+    x_back_offset = math.floor(-x_offset * ppi / 300)
+    y_back_offset = math.floor(y_offset * ppi / 300)
+
+    for image in images:
+        if add_offset:
+            result = ImageChops.offset(image, x_back_offset, y_back_offset)
+            if angle_offset != 0.0:
+                result = result.rotate(
+                    -angle_offset, 
+                    center = (image.width / 2, image.height / 2), 
+                    fillcolor="white"
+                )
+            result_images.append(result)
+        else:
+            result_images.append(image)
+        add_offset = not add_offset
+    return result_images
 
 
 
