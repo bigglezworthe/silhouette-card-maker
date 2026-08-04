@@ -78,7 +78,7 @@ def draw_card_with_bleed(
 
 def draw_card_layout(
     card_images: list[Image.Image | None],
-    single_back_image: Image.Image,
+    single_back_image: Image.Image | None,
     base_image: Image.Image,
     num_rows: int,
     num_cols: int,
@@ -210,6 +210,84 @@ def draw_card_layout(
         )
 
 
+# Doesn't save any lines of code but cleans up the call
+def draw_card_layouts(
+    front_card_images: list[Image.Image | None],
+    back_card_images: list[Image.Image | None],
+    single_back_image: Image.Image | None,
+    base_front_image: Image.Image,
+    base_back_image: Image.Image,
+    num_rows: int,
+    num_cols: int,
+    x_pos: list[int],
+    y_pos: list[int],
+    width: int,
+    height: int,
+    print_bleed: tuple[int, int],
+    crop: tuple[float, float],
+    crop_backs: tuple[float, float],
+    ppi_ratio: float,
+    extend_edges: int,
+    extend_edges_backs: int,
+    extend_corners_radius: int,
+    extend_corners_backs_radius: int,
+    extend_bleed: int,
+    extend_bleed_backs: int,
+    fit: FitMode,
+    fit_backs: FitMode,
+    orientation: Orientation,
+) -> None:
+    draw_card_layout(
+        front_card_images,
+        single_back_image,
+        base_front_image,
+        num_rows,
+        num_cols,
+        x_pos,
+        y_pos,
+        width,
+        height,
+        print_bleed,
+        crop,
+        crop_backs,
+        ppi_ratio,
+        extend_edges,
+        extend_edges_backs,
+        extend_corners_radius,
+        extend_corners_backs_radius,
+        extend_bleed,
+        flip=False,
+        fit=fit,
+        fit_backs=fit_backs,
+        orientation=orientation,
+    )
+
+    draw_card_layout(
+        back_card_images,
+        single_back_image,
+        base_back_image,
+        num_rows,
+        num_cols,
+        x_pos,
+        y_pos,
+        width,
+        height,
+        print_bleed,
+        crop,
+        crop_backs,
+        ppi_ratio,
+        extend_edges,
+        extend_edges_backs,
+        extend_corners_radius,
+        extend_corners_backs_radius,
+        extend_bleed_backs,
+        flip=True,
+        fit=fit,
+        fit_backs=fit_backs,
+        orientation=orientation,
+    )
+
+
 def draw_outline(
     page: Image.Image,
     x_pos: list[int],
@@ -235,3 +313,23 @@ def draw_outline(
                 width=1,
             )
 
+
+def draw_outlines(
+    pages: list[Image.Image],
+    x_pos: list[int],
+    y_pos: list[int],
+    card_width_px: int,
+    card_height_px: int,
+    radius_px: int,
+    ppi_ratio: float,
+) -> None:
+    for page in pages:
+        draw_outline(
+            page,
+            x_pos,
+            y_pos,
+            card_width_px,
+            card_height_px,
+            radius_px,
+            ppi_ratio,
+        )

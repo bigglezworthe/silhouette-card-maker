@@ -1,3 +1,4 @@
+from __future__ import annotations  # here for class property typing list[int]
 import math
 from typing import List, NamedTuple, Tuple
 
@@ -9,6 +10,7 @@ import io
 
 from src import measurements
 from src.enums import Orientation, Registration
+from src.layouts import load_layout_config
 
 # Registration mark constraints (in mm)
 MAX_REG_LENGTH_MM = 20.0
@@ -19,13 +21,21 @@ MIN_REG_THICKNESS_MM = 0.5
 MIN_REG_INSET_MM = 10.0
 REG_PADDING_MM = 1.5  # Extra clearance around registration marks
 
+# Inset
+_layout_config = load_layout_config()
+BORDERLESS_INSET_MM = measurements.size_to_mm(
+    _layout_config.defaults.registration.borderless.inset
+)
+BORDERLESS_EXPANSION_MM = (MIN_REG_INSET_MM - BORDERLESS_INSET_MM) * 2
+
+
 class CardLayout(NamedTuple):
     card_width_px: int
     card_height_px: int
     paper_width_px: int
     paper_height_px: int
-    x_pos: List[int]
-    y_pos: List[int]
+    x_pos: list[int]
+    y_pos: list[int]
     max_length_mm: float
 
 
@@ -69,18 +79,19 @@ def generate_reg_mark(
     ax = fig.add_axes([0, 0, 1, 1])  # Use full canvas
     ax.set_xlim(0, paper_width_mm)
     ax.set_ylim(0, paper_height_mm)
-    ax.set_aspect('equal')
-    ax.axis('off')
-    ax.set_facecolor('white')
+    ax.set_aspect("equal")
+    ax.axis("off")
+    ax.set_facecolor("white")
 
     if registration == Registration.THREE:
         # Add filled black square (5x5mm at inset from left and top)
         square = Rectangle(
             (inset_mm, paper_height_mm - inset_mm - 5),
-            5, 5,
-            facecolor='black',
-            edgecolor='black',
-            linewidth=thickness_pt
+            5,
+            5,
+            facecolor="black",
+            edgecolor="black",
+            linewidth=thickness_pt,
         )
         ax.add_patch(square)
     else:  # Registration.FOUR
@@ -89,7 +100,9 @@ def generate_reg_mark(
         x_end = inset_mm + length_mm - (thickness_mm / 2)
         y_start = paper_height_mm - inset_mm
         y_end = paper_height_mm - inset_mm
-        line = mlines.Line2D([x_start, x_end], [y_start, y_end], color='black', linewidth=thickness_pt)
+        line = mlines.Line2D(
+            [x_start, x_end], [y_start, y_end], color="black", linewidth=thickness_pt
+        )
         ax.add_line(line)
 
         # Top-left L-shape (vertical line)
@@ -97,7 +110,9 @@ def generate_reg_mark(
         x_end = inset_mm
         y_start = paper_height_mm - inset_mm
         y_end = paper_height_mm - inset_mm - length_mm + (thickness_mm / 2)
-        line = mlines.Line2D([x_start, x_end], [y_start, y_end], color='black', linewidth=thickness_pt)
+        line = mlines.Line2D(
+            [x_start, x_end], [y_start, y_end], color="black", linewidth=thickness_pt
+        )
         ax.add_line(line)
 
     # Bottom-left L-shape (horizontal line)
@@ -105,7 +120,9 @@ def generate_reg_mark(
     x_end = inset_mm + length_mm - (thickness_mm / 2)
     y_start = inset_mm
     y_end = inset_mm
-    line = mlines.Line2D([x_start, x_end], [y_start, y_end], color='black', linewidth=thickness_pt)
+    line = mlines.Line2D(
+        [x_start, x_end], [y_start, y_end], color="black", linewidth=thickness_pt
+    )
     ax.add_line(line)
 
     # Bottom-left L-shape (vertical line)
@@ -113,7 +130,9 @@ def generate_reg_mark(
     x_end = inset_mm
     y_start = inset_mm
     y_end = inset_mm + length_mm - (thickness_mm / 2)
-    line = mlines.Line2D([x_start, x_end], [y_start, y_end], color='black', linewidth=thickness_pt)
+    line = mlines.Line2D(
+        [x_start, x_end], [y_start, y_end], color="black", linewidth=thickness_pt
+    )
     ax.add_line(line)
 
     # Top-right L-shape (horizontal line)
@@ -121,7 +140,9 @@ def generate_reg_mark(
     x_end = paper_width_mm - inset_mm
     y_start = paper_height_mm - inset_mm
     y_end = paper_height_mm - inset_mm
-    line = mlines.Line2D([x_start, x_end], [y_start, y_end], color='black', linewidth=thickness_pt)
+    line = mlines.Line2D(
+        [x_start, x_end], [y_start, y_end], color="black", linewidth=thickness_pt
+    )
     ax.add_line(line)
 
     # Top-right L-shape (vertical line)
@@ -129,7 +150,9 @@ def generate_reg_mark(
     x_end = paper_width_mm - inset_mm
     y_start = paper_height_mm - inset_mm
     y_end = paper_height_mm - inset_mm - length_mm + (thickness_mm / 2)
-    line = mlines.Line2D([x_start, x_end], [y_start, y_end], color='black', linewidth=thickness_pt)
+    line = mlines.Line2D(
+        [x_start, x_end], [y_start, y_end], color="black", linewidth=thickness_pt
+    )
     ax.add_line(line)
 
     if registration == Registration.FOUR:
@@ -138,7 +161,9 @@ def generate_reg_mark(
         x_end = paper_width_mm - inset_mm
         y_start = inset_mm
         y_end = inset_mm
-        line = mlines.Line2D([x_start, x_end], [y_start, y_end], color='black', linewidth=thickness_pt)
+        line = mlines.Line2D(
+            [x_start, x_end], [y_start, y_end], color="black", linewidth=thickness_pt
+        )
         ax.add_line(line)
 
         # Bottom-right L-shape (vertical line)
@@ -146,12 +171,14 @@ def generate_reg_mark(
         x_end = paper_width_mm - inset_mm
         y_start = inset_mm
         y_end = inset_mm + length_mm - (thickness_mm / 2)
-        line = mlines.Line2D([x_start, x_end], [y_start, y_end], color='black', linewidth=thickness_pt)
+        line = mlines.Line2D(
+            [x_start, x_end], [y_start, y_end], color="black", linewidth=thickness_pt
+        )
         ax.add_line(line)
 
     # Save output
     img_buf = io.BytesIO()
-    plt.savefig(img_buf, format='jpg')
+    plt.savefig(img_buf, format="jpg")
     img_buf.seek(0)
     img = Image.open(img_buf)
     plt.close(fig)  # Close the figure to free memory
@@ -200,6 +227,7 @@ Definitions:
 # 1. Normalize page size for orientation
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def normalize_page_size(
     orientation: Orientation,
     paper_width_px: int,
@@ -218,6 +246,7 @@ def normalize_page_size(
 # 2. Compute how many cards fit along one axis
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def compute_grid_fit(
     usable: int,
     card: int,
@@ -228,7 +257,7 @@ def compute_grid_fit(
 
     | bleed | card | bleed | card | bleed |
       ^---------------------------------^ usable
-    
+
     But bleed can extend beyond the usable area. Only cards must be in the usable area.
 
     n cards require:
@@ -245,6 +274,7 @@ def compute_grid_fit(
 # ─────────────────────────────────────────────────────────────────────────────
 # 3. Select margins that avoid corner exclusion zones
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def select_best_margins(
     page_width: int,
@@ -279,9 +309,9 @@ def select_best_margins(
     """
 
     strategies = [
-        (inset, inset),                    # minimal margins
-        (inset + corner_len, inset),       # clear corners horizontally
-        (inset, inset + corner_len),       # clear corners vertically
+        (inset, inset),  # minimal margins
+        (inset + corner_len, inset),  # clear corners horizontally
+        (inset, inset + corner_len),  # clear corners vertically
     ]
 
     best = None
@@ -313,21 +343,35 @@ def select_best_margins(
             continue
 
         # Candidate 1: (max_cols, max_rows)
-        record_if_valid(max_cols, max_rows, margin_x, margin_y, usable_width, usable_height)
+        record_if_valid(
+            max_cols, max_rows, margin_x, margin_y, usable_width, usable_height
+        )
 
         # Candidates 2 and 3: shrink one axis until that axis clears the corner zone.
         # Derived from gap >= corner_len:
         #   gap_x = margin_x + (usable_w - cols*(cw+b) - b)/2 - inset >= corner_len
         #   → cols <= (usable_w - b - 2*(corner_len - margin_x + inset)) / (cw+b)
         # (same formula for rows/y by symmetry)
-        cols_clear = max(0, math.floor(
-            (usable_width - bleed - 2 * (corner_len - margin_x + inset)) / (card_width + bleed)
-        ))
-        rows_clear = max(0, math.floor(
-            (usable_height - bleed - 2 * (corner_len - margin_y + inset)) / (card_height + bleed)
-        ))
-        record_if_valid(cols_clear, max_rows, margin_x, margin_y, usable_width, usable_height)  # candidate 2
-        record_if_valid(max_cols, rows_clear, margin_x, margin_y, usable_width, usable_height)  # candidate 3
+        cols_clear = max(
+            0,
+            math.floor(
+                (usable_width - bleed - 2 * (corner_len - margin_x + inset))
+                / (card_width + bleed)
+            ),
+        )
+        rows_clear = max(
+            0,
+            math.floor(
+                (usable_height - bleed - 2 * (corner_len - margin_y + inset))
+                / (card_height + bleed)
+            ),
+        )
+        record_if_valid(
+            cols_clear, max_rows, margin_x, margin_y, usable_width, usable_height
+        )  # candidate 2
+        record_if_valid(
+            max_cols, rows_clear, margin_x, margin_y, usable_width, usable_height
+        )  # candidate 3
 
     if best is None:
         raise ValueError(
@@ -340,6 +384,7 @@ def select_best_margins(
 # ─────────────────────────────────────────────────────────────────────────────
 # 4. Compute centered card positions
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def compute_card_positions(
     cols: int,
@@ -429,8 +474,7 @@ def generate_layout(
 
     # Maximum registration mark length that fits with a bleed safety buffer
     max_length_px = max(
-        0,
-        max(start_x - inset_px, start_y - inset_px) - card_distance_px
+        0, max(start_x - inset_px, start_y - inset_px) - card_distance_px
     )
     max_length_mm = round(max_length_px * 25.4 / ppi, 2)
 
@@ -443,4 +487,3 @@ def generate_layout(
         y_pos=y_pos,
         max_length_mm=max_length_mm,
     )
-
