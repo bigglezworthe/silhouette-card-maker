@@ -8,8 +8,7 @@ from PIL import Image, ImageDraw
 from enum import Enum
 
 from src.enums import FitMode, Orientation
-from src.images import fill_rounded_corners
-from src.crop import crop_and_scale_image
+from src.images import fill_rounded_corners, crop_and_scale_image
 
 
 def draw_card_with_bleed(

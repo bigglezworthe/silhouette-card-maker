@@ -14,12 +14,12 @@ from pathlib import Path
 from PIL import Image, ImageFont, ImageDraw
 
 from src import measurements
-from src.crop import parse_crop_string
 from src.draw import draw_card_layouts, draw_outlines
 from src.enums import FitMode, Orientation, OrientationMode, Registration, Variant
 from src.images import (
     calculate_max_print_bleed,
     load_card_image,
+    parse_crop_string,
     parse_dimension_string,
 )
 from src.layouts import (

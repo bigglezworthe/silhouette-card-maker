@@ -5,8 +5,7 @@ import pytest
 from pathlib import Path
 from PIL import Image
 
-import utilities
-from src.crop import (
+from src.images import (
     parse_crop_string,
     convert_inch_to_crop,
     crop_and_scale_image,
@@ -170,53 +169,53 @@ class TestGetImageFilePaths:
         """Should find PNG files."""
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create a valid PNG file
-            img = Image.new('RGB', (100, 100), color='red')
-            img_path = os.path.join(tmpdir, 'test.png')
-            img.save(img_path, 'PNG')
+            img = Image.new("RGB", (100, 100), color="red")
+            img_path = os.path.join(tmpdir, "test.png")
+            img.save(img_path, "PNG")
 
             result = get_image_file_paths(tmpdir)
-            assert 'test.png' in result
+            assert "test.png" in result
 
     def test_finds_jpeg_files(self):
         """Should find JPEG files."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            img = Image.new('RGB', (100, 100), color='blue')
-            img_path = os.path.join(tmpdir, 'test.jpg')
-            img.save(img_path, 'JPEG')
+            img = Image.new("RGB", (100, 100), color="blue")
+            img_path = os.path.join(tmpdir, "test.jpg")
+            img.save(img_path, "JPEG")
 
             result = get_image_file_paths(tmpdir)
-            assert 'test.jpg' in result
+            assert "test.jpg" in result
 
     def test_ignores_non_image_files(self):
         """Should ignore non-image files."""
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create a text file
-            txt_path = os.path.join(tmpdir, 'readme.txt')
-            with open(txt_path, 'w') as f:
-                _ = f.write('hello')
+            txt_path = os.path.join(tmpdir, "readme.txt")
+            with open(txt_path, "w") as f:
+                _ = f.write("hello")
 
             result = get_image_file_paths(tmpdir)
-            assert 'readme.txt' not in result
+            assert "readme.txt" not in result
 
     def test_recursive_search(self):
         """Should find images in subdirectories."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            subdir = os.path.join(tmpdir, 'subdir')
+            subdir = os.path.join(tmpdir, "subdir")
             os.makedirs(subdir)
 
-            img = Image.new('RGB', (100, 100), color='green')
-            img_path = os.path.join(subdir, 'nested.png')
-            img.save(img_path, 'PNG')
+            img = Image.new("RGB", (100, 100), color="green")
+            img_path = os.path.join(subdir, "nested.png")
+            img.save(img_path, "PNG")
 
             result = get_image_file_paths(tmpdir)
-            assert any('nested.png' in r for r in result)
+            assert any("nested.png" in r for r in result)
 
     def test_returns_relative_paths(self):
         """Should return paths relative to input directory."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            img = Image.new('RGB', (100, 100), color='red')
-            img_path = os.path.join(tmpdir, 'test.png')
-            img.save(img_path, 'PNG')
+            img = Image.new("RGB", (100, 100), color="red")
+            img_path = os.path.join(tmpdir, "test.png")
+            img.save(img_path, "PNG")
 
             result = get_image_file_paths(tmpdir)
             # Should not contain the tmpdir path
@@ -232,37 +231,37 @@ class TestCheckPathsSubset:
 
     def test_all_in_mainset(self):
         """All subset items in mainset should return empty set."""
-        subset = {'card1.png', 'card2.jpg'}
-        mainset = {'card1.png', 'card2.png', 'card3.png'}
+        subset = {"card1.png", "card2.jpg"}
+        mainset = {"card1.png", "card2.png", "card3.png"}
         result = check_paths_subset(subset, mainset)
         assert result == set()
 
     def test_missing_from_mainset(self):
         """Items not in mainset should be returned."""
-        subset = {'card1.png', 'card4.png'}
-        mainset = {'card1.png', 'card2.png', 'card3.png'}
+        subset = {"card1.png", "card4.png"}
+        mainset = {"card1.png", "card2.png", "card3.png"}
         result = check_paths_subset(subset, mainset)
-        assert 'card4.png' in result
+        assert "card4.png" in result
 
     def test_ignores_extension(self):
         """Should match by stem, ignoring extension."""
-        subset = {'card1.jpg'}
-        mainset = {'card1.png'}
+        subset = {"card1.jpg"}
+        mainset = {"card1.png"}
         result = check_paths_subset(subset, mainset)
         # card1.jpg should match card1.png by stem
         assert result == set()
 
     def test_different_extensions_match(self):
         """Different extensions with same stem should match."""
-        subset = {'image.jpeg'}
-        mainset = {'image.png', 'other.png'}
+        subset = {"image.jpeg"}
+        mainset = {"image.png", "other.png"}
         result = check_paths_subset(subset, mainset)
         assert result == set()
 
     def test_with_paths(self):
         """Should work with path-like strings."""
-        subset = {'subdir/card1.png'}
-        mainset = {'card1.png', 'card2.png'}
+        subset = {"subdir/card1.png"}
+        mainset = {"card1.png", "card2.png"}
         # stem of 'subdir/card1.png' is 'card1'
         result = check_paths_subset(subset, mainset)
         assert result == set()
@@ -274,9 +273,9 @@ class TestResolveImageWithAnyExtension:
     def test_exact_path_exists(self):
         """Should return exact path if it exists."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            img = Image.new('RGB', (100, 100), color='red')
-            img_path = os.path.join(tmpdir, 'test.png')
-            img.save(img_path, 'PNG')
+            img = Image.new("RGB", (100, 100), color="red")
+            img_path = os.path.join(tmpdir, "test.png")
+            img.save(img_path, "PNG")
 
             result = resolve_image_with_any_extension(img_path)
             assert result == img_path
@@ -284,19 +283,19 @@ class TestResolveImageWithAnyExtension:
     def test_finds_different_extension(self):
         """Should find file with different extension."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            img = Image.new('RGB', (100, 100), color='red')
-            img_path = os.path.join(tmpdir, 'test.jpg')
-            img.save(img_path, 'JPEG')
+            img = Image.new("RGB", (100, 100), color="red")
+            img_path = os.path.join(tmpdir, "test.jpg")
+            img.save(img_path, "JPEG")
 
             # Request .png but .jpg exists
-            query_path = os.path.join(tmpdir, 'test.png')
+            query_path = os.path.join(tmpdir, "test.png")
             result = resolve_image_with_any_extension(query_path)
             assert result == img_path
 
     def test_missing_file_raises(self):
         """Should raise FileNotFoundError if no match found."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            query_path = os.path.join(tmpdir, 'nonexistent.png')
+            query_path = os.path.join(tmpdir, "nonexistent.png")
             with pytest.raises(FileNotFoundError, match="Missing image"):
                 _ = resolve_image_with_any_extension(query_path)
 
@@ -304,12 +303,12 @@ class TestResolveImageWithAnyExtension:
         """Should raise ValueError if multiple matches found."""
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create two files with same stem but different extensions
-            img = Image.new('RGB', (100, 100), color='red')
-            img.save(os.path.join(tmpdir, 'test.png'), 'PNG')
-            img.save(os.path.join(tmpdir, 'test.jpg'), 'JPEG')
+            img = Image.new("RGB", (100, 100), color="red")
+            img.save(os.path.join(tmpdir, "test.png"), "PNG")
+            img.save(os.path.join(tmpdir, "test.jpg"), "JPEG")
 
             # Request a non-existent extension to trigger glob search
-            query_path = os.path.join(tmpdir, 'test.gif')
+            query_path = os.path.join(tmpdir, "test.gif")
             with pytest.raises(ValueError, match="Ambiguous"):
                 _ = resolve_image_with_any_extension(query_path)
 
@@ -330,7 +329,7 @@ class TestCalculateMaxPrintBleed:
         y_pos = [100]
         result = calculate_max_print_bleed(x_pos, y_pos, 200, 300)
         assert result[0] == 50  # x bleed
-        assert result[1] == 0   # y bleed defaults to min_bleed (0)
+        assert result[1] == 0  # y bleed defaults to min_bleed (0)
 
     def test_two_rows(self):
         """Two rows should calculate vertical bleed; single column falls back to min_bleed."""
@@ -338,7 +337,7 @@ class TestCalculateMaxPrintBleed:
         y_pos = [100, 500]
         # Gap = 500 - 100 - 300 = 100, bleed = 100/2 = 50
         result = calculate_max_print_bleed(x_pos, y_pos, 200, 300)
-        assert result[0] == 0   # x bleed defaults to min_bleed (0)
+        assert result[0] == 0  # x bleed defaults to min_bleed (0)
         assert result[1] == 50  # y bleed
 
     def test_grid_layout(self):
@@ -390,9 +389,9 @@ class TestDeleteHiddenFilesInDirectory:
     def test_removes_ds_store(self):
         """Should remove .DS_Store files."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            ds_store = os.path.join(tmpdir, '.DS_Store')
-            with open(ds_store, 'w') as f:
-                _ = f.write('junk')
+            ds_store = os.path.join(tmpdir, ".DS_Store")
+            with open(ds_store, "w") as f:
+                _ = f.write("junk")
 
             delete_hidden_files_in_directory(Path(tmpdir))
             assert not os.path.exists(ds_store)
@@ -400,9 +399,9 @@ class TestDeleteHiddenFilesInDirectory:
     def test_removes_thumbs_db(self):
         """Should remove Thumbs.db files."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            thumbs = os.path.join(tmpdir, 'Thumbs.db')
-            with open(thumbs, 'w') as f:
-                _ = f.write('junk')
+            thumbs = os.path.join(tmpdir, "Thumbs.db")
+            with open(thumbs, "w") as f:
+                _ = f.write("junk")
 
             delete_hidden_files_in_directory(Path(tmpdir))
             assert not os.path.exists(thumbs)
@@ -410,9 +409,9 @@ class TestDeleteHiddenFilesInDirectory:
     def test_removes_desktop_ini(self):
         """Should remove desktop.ini files."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            desktop_ini = os.path.join(tmpdir, 'desktop.ini')
-            with open(desktop_ini, 'w') as f:
-                _ = f.write('junk')
+            desktop_ini = os.path.join(tmpdir, "desktop.ini")
+            with open(desktop_ini, "w") as f:
+                _ = f.write("junk")
 
             delete_hidden_files_in_directory(Path(tmpdir))
             assert not os.path.exists(desktop_ini)
@@ -420,9 +419,9 @@ class TestDeleteHiddenFilesInDirectory:
     def test_removes_apple_double_files(self):
         """Should remove Apple double files (._prefix)."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            apple_double = os.path.join(tmpdir, '._image.png')
-            with open(apple_double, 'w') as f:
-                _ = f.write('junk')
+            apple_double = os.path.join(tmpdir, "._image.png")
+            with open(apple_double, "w") as f:
+                _ = f.write("junk")
 
             delete_hidden_files_in_directory(Path(tmpdir))
             assert not os.path.exists(apple_double)
@@ -430,9 +429,9 @@ class TestDeleteHiddenFilesInDirectory:
     def test_preserves_normal_files(self):
         """Should not remove normal files."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            normal_file = os.path.join(tmpdir, 'image.png')
-            with open(normal_file, 'w') as f:
-                _ = f.write('data')
+            normal_file = os.path.join(tmpdir, "image.png")
+            with open(normal_file, "w") as f:
+                _ = f.write("data")
 
             delete_hidden_files_in_directory(Path(tmpdir))
             assert os.path.exists(normal_file)
@@ -450,9 +449,9 @@ class TestGetDirectory:
     def test_file_path(self):
         """File path should return absolute parent directory."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            file_path = os.path.join(tmpdir, 'test.txt')
-            with open(file_path, 'w') as f:
-                _ = f.write('test')
+            file_path = os.path.join(tmpdir, "test.txt")
+            with open(file_path, "w") as f:
+                _ = f.write("test")
 
             result = get_directory(Path(file_path))
             assert result == os.path.abspath(tmpdir)
@@ -468,18 +467,18 @@ class TestOffsetImages:
 
     def test_single_image_no_offset(self):
         """Single image (front page) should not be offset."""
-        img = Image.new('RGB', (100, 100), color='red')
+        img = Image.new("RGB", (100, 100), color="red")
         result = offset_images([img], 10, 10, 300)
         assert len(result) == 1
         assert result[0] is img  # Same object, not modified
 
     def test_alternating_offset(self):
         """Should offset every other image (back pages)."""
-        img1 = Image.new('RGB', (100, 100), color='red')
-        img3 = Image.new('RGB', (100, 100), color='green')
+        img1 = Image.new("RGB", (100, 100), color="red")
+        img3 = Image.new("RGB", (100, 100), color="green")
 
         # img2 has a white marker pixel at (0, 0) on a black background
-        img2 = Image.new('RGB', (100, 100), color='black')
+        img2 = Image.new("RGB", (100, 100), color="black")
         img2.putpixel((0, 0), (255, 255, 255))
 
         result = offset_images([img1, img2, img3], 10, 10, 300)
@@ -494,12 +493,12 @@ class TestOffsetImages:
 
     def test_ppi_scaling(self):
         """Offset should scale with PPI."""
-        img_front = Image.new('RGB', (100, 100), color='red')
+        img_front = Image.new("RGB", (100, 100), color="red")
 
         # White marker pixel at (0, 0) on a black background
-        img_back_a = Image.new('RGB', (100, 100), color='black')
+        img_back_a = Image.new("RGB", (100, 100), color="black")
         img_back_a.putpixel((0, 0), (255, 255, 255))
-        img_back_b = Image.new('RGB', (100, 100), color='black')
+        img_back_b = Image.new("RGB", (100, 100), color="black")
         img_back_b.putpixel((0, 0), (255, 255, 255))
 
         # x_offset is negated: floor(-30 * 300/300) = -30 pixels → wraps to 70 in 100px image
@@ -584,9 +583,9 @@ class TestGetBackCardImagePath:
     def test_non_image_files_returns_none(self):
         """Directory with only non-image files should return None."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            txt_path = os.path.join(tmpdir, 'readme.txt')
-            with open(txt_path, 'w') as f:
-                f.write('not an image')
+            txt_path = os.path.join(tmpdir, "readme.txt")
+            with open(txt_path, "w") as f:
+                f.write("not an image")
 
             result = get_back_card_image_path(tmpdir)
             assert result is None
@@ -594,13 +593,13 @@ class TestGetBackCardImagePath:
     def test_single_image_returns_path(self):
         """Directory with one image should return that image's path."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            img = Image.new('RGB', (100, 100), color='red')
-            img_path = os.path.join(tmpdir, 'back.png')
-            img.save(img_path, 'PNG')
+            img = Image.new("RGB", (100, 100), color="red")
+            img_path = os.path.join(tmpdir, "back.png")
+            img.save(img_path, "PNG")
 
             result = get_back_card_image_path(tmpdir)
             assert result is not None
-            assert str(result).endswith('back.png')
+            assert str(result).endswith("back.png")
 
 
 class TestCropAndScaleImage:
@@ -610,7 +609,7 @@ class TestCropAndScaleImage:
         """STRETCH with enough source pixels should use real bleed on both axes."""
         # 300x420 source, 20% crop → cropped 240x336, ratio 1.2
         # unscaled bleed: 210*1.2=252 <= 300, 290*1.2=348 <= 420
-        img = Image.new('RGB', (300, 420), color='red')
+        img = Image.new("RGB", (300, 420), color="red")
         result_img, off_x, off_y, synth = crop_and_scale_image(
             img, 20, 20, 200, 280, 5, 5, FitMode.STRETCH
         )
@@ -623,7 +622,7 @@ class TestCropAndScaleImage:
         """STRETCH without room for bleed should fall back to synthetic bleed."""
         # 200x280 source, 10% crop → cropped 180x252, ratio 0.9
         # unscaled bleed: 300*0.9=270 > 200
-        img = Image.new('RGB', (200, 280), color='red')
+        img = Image.new("RGB", (200, 280), color="red")
         result_img, off_x, off_y, synth = crop_and_scale_image(
             img, 10, 10, 200, 280, 50, 50, FitMode.STRETCH
         )
@@ -634,7 +633,7 @@ class TestCropAndScaleImage:
 
     def test_zero_crop_zero_bleed(self):
         """Zero crop and zero bleed should resize to target dimensions."""
-        img = Image.new('RGB', (500, 700), color='red')
+        img = Image.new("RGB", (500, 700), color="red")
         result_img, off_x, off_y, synth = crop_and_scale_image(
             img, 0, 0, 200, 280, 0, 0, FitMode.STRETCH
         )
@@ -647,7 +646,7 @@ class TestCropAndScaleImage:
         """CROP mode with room on both axes should use real bleed."""
         # 300x420 source, 20% crop, uniform ratio = min(240/200, 336/280) = 1.2
         # unscaled bleed: 210*1.2=252 <= 300, 290*1.2=348 <= 420
-        img = Image.new('RGB', (300, 420), color='red')
+        img = Image.new("RGB", (300, 420), color="red")
         result_img, off_x, off_y, synth = crop_and_scale_image(
             img, 20, 20, 200, 280, 5, 5, FitMode.CROP
         )
@@ -660,7 +659,7 @@ class TestCropAndScaleImage:
         """CROP mode with wide source should have real X bleed, synthetic Y."""
         # 300x280 source, 0% crop, uniform ratio = min(1.5, 1.0) = 1.0
         # unscaled X: 220*1.0=220 <= 300, unscaled Y: 300*1.0=300 > 280
-        img = Image.new('RGB', (300, 280), color='red')
+        img = Image.new("RGB", (300, 280), color="red")
         result_img, off_x, off_y, synth = crop_and_scale_image(
             img, 0, 0, 200, 280, 10, 10, FitMode.CROP
         )
@@ -673,7 +672,7 @@ class TestCropAndScaleImage:
         """CROP mode with tall source should have synthetic X, real Y bleed."""
         # 200x420 source, 0% crop, uniform ratio = min(1.0, 1.5) = 1.0
         # unscaled X: 220*1.0=220 > 200, unscaled Y: 300*1.0=300 <= 420
-        img = Image.new('RGB', (200, 420), color='red')
+        img = Image.new("RGB", (200, 420), color="red")
         result_img, off_x, off_y, synth = crop_and_scale_image(
             img, 0, 0, 200, 280, 10, 10, FitMode.CROP
         )
@@ -686,7 +685,7 @@ class TestCropAndScaleImage:
         """CROP mode with tight source should use synthetic bleed on both axes."""
         # 200x280 source, 0% crop, uniform ratio = 1.0
         # unscaled X: 220 > 200, unscaled Y: 300 > 280
-        img = Image.new('RGB', (200, 280), color='red')
+        img = Image.new("RGB", (200, 280), color="red")
         result_img, off_x, off_y, synth = crop_and_scale_image(
             img, 0, 0, 200, 280, 10, 10, FitMode.CROP
         )
@@ -716,8 +715,8 @@ class TestDrawCardWithBleed:
 
         C = card area, surrounding = bleed, outside = empty
         """
-        card = Image.new('RGB', (10, 10), color='red')
-        base = Image.new('RGB', (40, 40), color='white')
+        card = Image.new("RGB", (10, 10), color="red")
+        base = Image.new("RGB", (40, 40), color="white")
         _ = draw_card_with_bleed(card, base, 15, 15, (5, 5))
         # Card area
         assert base.getpixel((15, 15)) == self.RED
@@ -741,8 +740,8 @@ class TestDrawCardWithBleed:
         *edge* = edge bleed regions checked in this test
         Pixels at x/y = 9 and 30 (just outside) should be empty.
         """
-        card = Image.new('RGB', (10, 10), color='red')
-        base = Image.new('RGB', (40, 40), color='white')
+        card = Image.new("RGB", (10, 10), color="red")
+        base = Image.new("RGB", (40, 40), color="white")
         _ = draw_card_with_bleed(card, base, 15, 15, (5, 5))
         # Top bleed: top row extended upward
         assert base.getpixel((15, 14)) == self.RED
@@ -777,8 +776,8 @@ class TestDrawCardWithBleed:
         *XX* = corner bleed regions checked in this test
         Pixels at x/y = 9 and 30 (just outside) should be empty.
         """
-        card = Image.new('RGB', (10, 10), color='red')
-        base = Image.new('RGB', (40, 40), color='white')
+        card = Image.new("RGB", (10, 10), color="red")
+        base = Image.new("RGB", (40, 40), color="white")
         _ = draw_card_with_bleed(card, base, 15, 15, (5, 5))
         # Top-left corner bleed region
         assert base.getpixel((10, 10)) == self.RED
@@ -809,8 +808,8 @@ class TestDrawCardWithBleed:
         No bleed regions — pixels at x=14, x=25, y=14, y=25
         should all be empty.
         """
-        card = Image.new('RGB', (10, 10), color='red')
-        base = Image.new('RGB', (40, 40), color='white')
+        card = Image.new("RGB", (10, 10), color="red")
+        base = Image.new("RGB", (40, 40), color="white")
         _ = draw_card_with_bleed(card, base, 15, 15, (0, 0))
         # Card area
         assert base.getpixel((15, 15)) == self.RED
@@ -834,35 +833,46 @@ class TestDrawCardLayout:
     def test_single_card_placed(self):
         """Single card in 1x1 layout should be placed at the layout position.
 
-        Base 300x400, card 100x140 at (50,50):
+         Base 300x400, card 100x140 at (50,50):
 
-           0    50       149         299
-        0  +----+--------+-----------+
-           |    |        |           |
-        50 | .. RRRRRRRRRR ......... |
-           |    R  card  R   empty   |
-       189 | .. RRRRRRRRRR ......... |
-           |    |        |           |
-       399 +----+--------+-----------+
+            0    50       149         299
+         0  +----+--------+-----------+
+            |    |        |           |
+         50 | .. RRRRRRRRRR ......... |
+            |    R  card  R   empty   |
+        189 | .. RRRRRRRRRR ......... |
+            |    |        |           |
+        399 +----+--------+-----------+
 
-        R = red card, . = empty (white)
+         R = red card, . = empty (white)
         """
-        card = Image.new('RGB', (100, 140), color='red')
-        back = Image.new('RGB', (100, 140), color='blue')
-        base = Image.new('RGB', (300, 400), color='white')
+        card = Image.new("RGB", (100, 140), color="red")
+        back = Image.new("RGB", (100, 140), color="blue")
+        base = Image.new("RGB", (300, 400), color="white")
 
         draw_card_layout(
             card_images=[card],
             single_back_image=back,
             base_image=base,
-            num_rows=1, num_cols=1,
-            x_pos=[50], y_pos=[50],
-            width=100, height=140,
+            num_rows=1,
+            num_cols=1,
+            x_pos=[50],
+            y_pos=[50],
+            width=100,
+            height=140,
             print_bleed=(0, 0),
-            crop=(0, 0), crop_backs=(0, 0),
-            ppi_ratio=1.0, extend_edges=0, extend_edges_backs=0, extend_corners_radius=0, extend_corners_backs_radius=0, extend_bleed=0,
-            flip=False, fit=FitMode.STRETCH, fit_backs=FitMode.STRETCH,
-            orientation=Orientation.PORTRAIT
+            crop=(0, 0),
+            crop_backs=(0, 0),
+            ppi_ratio=1.0,
+            extend_edges=0,
+            extend_edges_backs=0,
+            extend_corners_radius=0,
+            extend_corners_backs_radius=0,
+            extend_bleed=0,
+            flip=False,
+            fit=FitMode.STRETCH,
+            fit_backs=FitMode.STRETCH,
+            orientation=Orientation.PORTRAIT,
         )
         assert base.getpixel((50, 50)) == self.RED
         assert base.getpixel((100, 100)) == self.RED
@@ -882,22 +892,33 @@ class TestDrawCardLayout:
         |                          |
         +==========================+
         """
-        back = Image.new('RGB', (100, 140), color='blue')
-        base = Image.new('RGB', (300, 400), color='white')
+        back = Image.new("RGB", (100, 140), color="blue")
+        base = Image.new("RGB", (300, 400), color="white")
         original_data = list(base.tobytes())
 
         draw_card_layout(
             card_images=[None],
             single_back_image=back,
             base_image=base,
-            num_rows=1, num_cols=1,
-            x_pos=[50], y_pos=[50],
-            width=100, height=140,
+            num_rows=1,
+            num_cols=1,
+            x_pos=[50],
+            y_pos=[50],
+            width=100,
+            height=140,
             print_bleed=(0, 0),
-            crop=(0, 0), crop_backs=(0, 0),
-            ppi_ratio=1.0, extend_edges=0, extend_edges_backs=0, extend_corners_radius=0, extend_corners_backs_radius=0, extend_bleed=0,
-            flip=False, fit=FitMode.STRETCH, fit_backs=FitMode.STRETCH,
-            orientation=Orientation.PORTRAIT
+            crop=(0, 0),
+            crop_backs=(0, 0),
+            ppi_ratio=1.0,
+            extend_edges=0,
+            extend_edges_backs=0,
+            extend_corners_radius=0,
+            extend_corners_backs_radius=0,
+            extend_bleed=0,
+            flip=False,
+            fit=FitMode.STRETCH,
+            fit_backs=FitMode.STRETCH,
+            orientation=Orientation.PORTRAIT,
         )
         assert list(base.tobytes()) == original_data
 
@@ -916,23 +937,34 @@ class TestDrawCardLayout:
               | blue   |           | red    |
          389  +--------+      389  +--------+
         """
-        red_card = Image.new('RGB', (100, 140), color='red')
-        blue_card = Image.new('RGB', (100, 140), color='blue')
-        back = Image.new('RGB', (100, 140), color='green')
-        base = Image.new('RGB', (300, 500), color='white')
+        red_card = Image.new("RGB", (100, 140), color="red")
+        blue_card = Image.new("RGB", (100, 140), color="blue")
+        back = Image.new("RGB", (100, 140), color="green")
+        base = Image.new("RGB", (300, 500), color="white")
 
         draw_card_layout(
             card_images=[red_card, blue_card],
             single_back_image=back,
             base_image=base,
-            num_rows=2, num_cols=1,
-            x_pos=[50], y_pos=[50, 250],
-            width=100, height=140,
+            num_rows=2,
+            num_cols=1,
+            x_pos=[50],
+            y_pos=[50, 250],
+            width=100,
+            height=140,
             print_bleed=(0, 0),
-            crop=(0, 0), crop_backs=(0, 0),
-            ppi_ratio=1.0, extend_edges=0, extend_edges_backs=0, extend_corners_radius=0, extend_corners_backs_radius=0, extend_bleed=0,
-            flip=True, fit=FitMode.STRETCH, fit_backs=FitMode.STRETCH,
-            orientation=Orientation.LANDSCAPE
+            crop=(0, 0),
+            crop_backs=(0, 0),
+            ppi_ratio=1.0,
+            extend_edges=0,
+            extend_edges_backs=0,
+            extend_corners_radius=0,
+            extend_corners_backs_radius=0,
+            extend_bleed=0,
+            flip=True,
+            fit=FitMode.STRETCH,
+            fit_backs=FitMode.STRETCH,
+            orientation=Orientation.LANDSCAPE,
         )
         # With flip: card 0 (red) goes to row 1 (y=250), card 1 (blue) to row 0 (y=50)
         # Images are rotated 180 degrees, but still the same color
@@ -942,40 +974,51 @@ class TestDrawCardLayout:
     def test_multi_card_grid(self):
         """2x2 grid should place 4 cards at the correct positions.
 
-        Base 300x400, 2x2 grid:
+         Base 300x400, 2x2 grid:
 
-           10       109  150      249
-        10 RRRRRRRRRR    BBBBBBBBBB
-           R card0  R    B card1  B
-       149 RRRRRRRRRR    BBBBBBBBBB
+            10       109  150      249
+         10 RRRRRRRRRR    BBBBBBBBBB
+            R card0  R    B card1  B
+        149 RRRRRRRRRR    BBBBBBBBBB
 
-       200 GGGGGGGGGG    YYYYYYYYYY
-           G card2  G    Y card3  Y
-       339 GGGGGGGGGG    YYYYYYYYYY
+        200 GGGGGGGGGG    YYYYYYYYYY
+            G card2  G    Y card3  Y
+        339 GGGGGGGGGG    YYYYYYYYYY
 
-        R=red, B=blue, G=green, Y=yellow
+         R=red, B=blue, G=green, Y=yellow
         """
         cards = [
-            Image.new('RGB', (100, 140), color='red'),
-            Image.new('RGB', (100, 140), color='blue'),
-            Image.new('RGB', (100, 140), color='green'),
-            Image.new('RGB', (100, 140), color='yellow'),
+            Image.new("RGB", (100, 140), color="red"),
+            Image.new("RGB", (100, 140), color="blue"),
+            Image.new("RGB", (100, 140), color="green"),
+            Image.new("RGB", (100, 140), color="yellow"),
         ]
-        back = Image.new('RGB', (100, 140), color='gray')
-        base = Image.new('RGB', (300, 400), color='white')
+        back = Image.new("RGB", (100, 140), color="gray")
+        base = Image.new("RGB", (300, 400), color="white")
 
         draw_card_layout(
             card_images=cards,
             single_back_image=back,
             base_image=base,
-            num_rows=2, num_cols=2,
-            x_pos=[10, 150], y_pos=[10, 200],
-            width=100, height=140,
+            num_rows=2,
+            num_cols=2,
+            x_pos=[10, 150],
+            y_pos=[10, 200],
+            width=100,
+            height=140,
             print_bleed=(0, 0),
-            crop=(0, 0), crop_backs=(0, 0),
-            ppi_ratio=1.0, extend_edges=0, extend_edges_backs=0, extend_corners_radius=0, extend_corners_backs_radius=0, extend_bleed=0,
-            flip=False, fit=FitMode.STRETCH, fit_backs=FitMode.STRETCH,
-            orientation=Orientation.PORTRAIT
+            crop=(0, 0),
+            crop_backs=(0, 0),
+            ppi_ratio=1.0,
+            extend_edges=0,
+            extend_edges_backs=0,
+            extend_corners_radius=0,
+            extend_corners_backs_radius=0,
+            extend_bleed=0,
+            flip=False,
+            fit=FitMode.STRETCH,
+            fit_backs=FitMode.STRETCH,
+            orientation=Orientation.PORTRAIT,
         )
         # Card 0 (red) at top-left
         assert base.getpixel((10, 10)) == self.RED
@@ -1009,22 +1052,33 @@ class TestDrawCardLayout:
 
         C = card, surrounding = bleed, outside = empty
         """
-        card = Image.new('RGB', (10, 10), color='red')
-        back = Image.new('RGB', (10, 10), color='blue')
-        base = Image.new('RGB', (40, 40), color='white')
+        card = Image.new("RGB", (10, 10), color="red")
+        back = Image.new("RGB", (10, 10), color="blue")
+        base = Image.new("RGB", (40, 40), color="white")
 
         draw_card_layout(
             card_images=[card],
             single_back_image=back,
             base_image=base,
-            num_rows=1, num_cols=1,
-            x_pos=[15], y_pos=[15],
-            width=10, height=10,
+            num_rows=1,
+            num_cols=1,
+            x_pos=[15],
+            y_pos=[15],
+            width=10,
+            height=10,
             print_bleed=(5, 5),
-            crop=(0, 0), crop_backs=(0, 0),
-            ppi_ratio=1.0, extend_edges=0, extend_edges_backs=0, extend_corners_radius=0, extend_corners_backs_radius=0, extend_bleed=0,
-            flip=False, fit=FitMode.STRETCH, fit_backs=FitMode.STRETCH,
-            orientation=Orientation.PORTRAIT
+            crop=(0, 0),
+            crop_backs=(0, 0),
+            ppi_ratio=1.0,
+            extend_edges=0,
+            extend_edges_backs=0,
+            extend_corners_radius=0,
+            extend_corners_backs_radius=0,
+            extend_bleed=0,
+            flip=False,
+            fit=FitMode.STRETCH,
+            fit_backs=FitMode.STRETCH,
+            orientation=Orientation.PORTRAIT,
         )
         # Card area
         assert base.getpixel((15, 15)) == self.RED
@@ -1056,22 +1110,33 @@ class TestDrawCardLayout:
 
         Everything is doubled from the unscaled values.
         """
-        card = Image.new('RGB', (10, 10), color='red')
-        back = Image.new('RGB', (10, 10), color='blue')
-        base = Image.new('RGB', (80, 80), color='white')
+        card = Image.new("RGB", (10, 10), color="red")
+        back = Image.new("RGB", (10, 10), color="blue")
+        base = Image.new("RGB", (80, 80), color="white")
 
         draw_card_layout(
             card_images=[card],
             single_back_image=back,
             base_image=base,
-            num_rows=1, num_cols=1,
-            x_pos=[10], y_pos=[10],
-            width=10, height=10,
+            num_rows=1,
+            num_cols=1,
+            x_pos=[10],
+            y_pos=[10],
+            width=10,
+            height=10,
             print_bleed=(0, 0),
-            crop=(0, 0), crop_backs=(0, 0),
-            ppi_ratio=2.0, extend_edges=0, extend_edges_backs=0, extend_corners_radius=0, extend_corners_backs_radius=0, extend_bleed=0,
-            flip=False, fit=FitMode.STRETCH, fit_backs=FitMode.STRETCH,
-            orientation=Orientation.PORTRAIT
+            crop=(0, 0),
+            crop_backs=(0, 0),
+            ppi_ratio=2.0,
+            extend_edges=0,
+            extend_edges_backs=0,
+            extend_corners_radius=0,
+            extend_corners_backs_radius=0,
+            extend_bleed=0,
+            flip=False,
+            fit=FitMode.STRETCH,
+            fit_backs=FitMode.STRETCH,
+            orientation=Orientation.PORTRAIT,
         )
         # Card at scaled position (20,20) with scaled size 20x20
         assert base.getpixel((20, 20)) == self.RED
@@ -1097,26 +1162,37 @@ class TestDrawCardLayout:
 
         Result: card area should be red (center survived crop).
         """
-        card = Image.new('RGB', (200, 200), color='blue')
+        card = Image.new("RGB", (200, 200), color="blue")
         # Paint red center (50,50)-(149,149)
         for x in range(50, 150):
             for y in range(50, 150):
                 card.putpixel((x, y), (255, 0, 0))
-        back = Image.new('RGB', (200, 200), color='gray')
-        base = Image.new('RGB', (200, 200), color='white')
+        back = Image.new("RGB", (200, 200), color="gray")
+        base = Image.new("RGB", (200, 200), color="white")
 
         draw_card_layout(
             card_images=[card],
             single_back_image=back,
             base_image=base,
-            num_rows=1, num_cols=1,
-            x_pos=[50], y_pos=[50],
-            width=100, height=100,
+            num_rows=1,
+            num_cols=1,
+            x_pos=[50],
+            y_pos=[50],
+            width=100,
+            height=100,
             print_bleed=(0, 0),
-            crop=(50, 50), crop_backs=(0, 0),
-            ppi_ratio=1.0, extend_edges=0, extend_edges_backs=0, extend_corners_radius=0, extend_corners_backs_radius=0, extend_bleed=0,
-            flip=False, fit=FitMode.STRETCH, fit_backs=FitMode.STRETCH,
-            orientation=Orientation.PORTRAIT
+            crop=(50, 50),
+            crop_backs=(0, 0),
+            ppi_ratio=1.0,
+            extend_edges=0,
+            extend_edges_backs=0,
+            extend_corners_radius=0,
+            extend_corners_backs_radius=0,
+            extend_bleed=0,
+            flip=False,
+            fit=FitMode.STRETCH,
+            fit_backs=FitMode.STRETCH,
+            orientation=Orientation.PORTRAIT,
         )
         # Card area should be red (cropped to center, then stretched)
         assert base.getpixel((50, 50)) == self.RED
@@ -1135,24 +1211,35 @@ class TestDrawCardLayout:
         Since card `is` single_back_image, crop_backs is used.
         Result: card area should be red (center survived crop).
         """
-        back = Image.new('RGB', (200, 200), color='green')
+        back = Image.new("RGB", (200, 200), color="green")
         for x in range(50, 150):
             for y in range(50, 150):
                 back.putpixel((x, y), self.RED)
-        base = Image.new('RGB', (200, 200), color='white')
+        base = Image.new("RGB", (200, 200), color="white")
 
         draw_card_layout(
             card_images=[back],
             single_back_image=back,
             base_image=base,
-            num_rows=1, num_cols=1,
-            x_pos=[50], y_pos=[50],
-            width=100, height=100,
+            num_rows=1,
+            num_cols=1,
+            x_pos=[50],
+            y_pos=[50],
+            width=100,
+            height=100,
             print_bleed=(0, 0),
-            crop=(0, 0), crop_backs=(50, 50),
-            ppi_ratio=1.0, extend_edges=0, extend_edges_backs=0, extend_corners_radius=0, extend_corners_backs_radius=0, extend_bleed=0,
-            flip=False, fit=FitMode.STRETCH, fit_backs=FitMode.STRETCH,
-            orientation=Orientation.PORTRAIT
+            crop=(0, 0),
+            crop_backs=(50, 50),
+            ppi_ratio=1.0,
+            extend_edges=0,
+            extend_edges_backs=0,
+            extend_corners_radius=0,
+            extend_corners_backs_radius=0,
+            extend_bleed=0,
+            flip=False,
+            fit=FitMode.STRETCH,
+            fit_backs=FitMode.STRETCH,
+            orientation=Orientation.PORTRAIT,
         )
         # Card area should be red (crop_backs applied to center)
         assert base.getpixel((50, 50)) == self.RED
@@ -1174,28 +1261,39 @@ class TestDrawCardLayout:
           B blue B     red    G green G
           BBBBBBBBRRRRRRRRRRRRRGGGGGGGG
         """
-        card = Image.new('RGB', (200, 100), color='red')
+        card = Image.new("RGB", (200, 100), color="red")
         for x in range(20):
             for y in range(100):
                 card.putpixel((x, y), self.BLUE)
         for x in range(180, 200):
             for y in range(100):
                 card.putpixel((x, y), self.GREEN)
-        back = Image.new('RGB', (200, 100), color='gray')
-        base = Image.new('RGB', (200, 200), color='white')
+        back = Image.new("RGB", (200, 100), color="gray")
+        base = Image.new("RGB", (200, 200), color="white")
 
         draw_card_layout(
             card_images=[card],
             single_back_image=back,
             base_image=base,
-            num_rows=1, num_cols=1,
-            x_pos=[50], y_pos=[50],
-            width=100, height=100,
+            num_rows=1,
+            num_cols=1,
+            x_pos=[50],
+            y_pos=[50],
+            width=100,
+            height=100,
             print_bleed=(0, 0),
-            crop=(0, 0), crop_backs=(0, 0),
-            ppi_ratio=1.0, extend_edges=0, extend_edges_backs=0, extend_corners_radius=0, extend_corners_backs_radius=0, extend_bleed=0,
-            flip=False, fit=FitMode.STRETCH, fit_backs=FitMode.STRETCH,
-            orientation=Orientation.PORTRAIT
+            crop=(0, 0),
+            crop_backs=(0, 0),
+            ppi_ratio=1.0,
+            extend_edges=0,
+            extend_edges_backs=0,
+            extend_corners_radius=0,
+            extend_corners_backs_radius=0,
+            extend_bleed=0,
+            flip=False,
+            fit=FitMode.STRETCH,
+            fit_backs=FitMode.STRETCH,
+            orientation=Orientation.PORTRAIT,
         )
         # Left edge should be blue (stretched but preserved)
         assert base.getpixel((50, 80)) == self.BLUE
@@ -1217,28 +1315,39 @@ class TestDrawCardLayout:
           R   red  R
           RRRRRRRRRR
         """
-        card = Image.new('RGB', (200, 100), color='red')
+        card = Image.new("RGB", (200, 100), color="red")
         for x in range(20):
             for y in range(100):
                 card.putpixel((x, y), self.BLUE)
         for x in range(180, 200):
             for y in range(100):
                 card.putpixel((x, y), (0, 128, 0))
-        back = Image.new('RGB', (200, 100), color='gray')
-        base = Image.new('RGB', (200, 200), color='white')
+        back = Image.new("RGB", (200, 100), color="gray")
+        base = Image.new("RGB", (200, 200), color="white")
 
         draw_card_layout(
             card_images=[card],
             single_back_image=back,
             base_image=base,
-            num_rows=1, num_cols=1,
-            x_pos=[50], y_pos=[50],
-            width=100, height=100,
+            num_rows=1,
+            num_cols=1,
+            x_pos=[50],
+            y_pos=[50],
+            width=100,
+            height=100,
             print_bleed=(0, 0),
-            crop=(0, 0), crop_backs=(0, 0),
-            ppi_ratio=1.0, extend_edges=0, extend_edges_backs=0, extend_corners_radius=0, extend_corners_backs_radius=0, extend_bleed=0,
-            flip=False, fit=FitMode.CROP, fit_backs=FitMode.CROP,
-            orientation=Orientation.PORTRAIT
+            crop=(0, 0),
+            crop_backs=(0, 0),
+            ppi_ratio=1.0,
+            extend_edges=0,
+            extend_edges_backs=0,
+            extend_corners_radius=0,
+            extend_corners_backs_radius=0,
+            extend_bleed=0,
+            flip=False,
+            fit=FitMode.CROP,
+            fit_backs=FitMode.CROP,
+            orientation=Orientation.PORTRAIT,
         )
         # All edges should be red (blue/green sides were cropped off)
         assert base.getpixel((50, 80)) == self.RED
@@ -1250,42 +1359,53 @@ class TestDrawCardLayout:
     def test_fit_stretch_keeps_tall_card_edges(self):
         """STRETCH squishes a tall card, keeping top/bottom edge colors.
 
-        Card 100x200: blue 20px top, green 20px bottom, red center.
-        Target 100x100. STRETCH compresses full height into target.
+         Card 100x200: blue 20px top, green 20px bottom, red center.
+         Target 100x100. STRETCH compresses full height into target.
 
-        Resized: 10px blue / 80px red / 10px green
+         Resized: 10px blue / 80px red / 10px green
 
-          50         149
-        50 BBBBBBBBBBB
-        59 BBBBBBBBBBB
-        60 RRRRRRRRRRR
-           R   red   R
-       139 RRRRRRRRRRR
-       140 GGGGGGGGGGG
-       149 GGGGGGGGGGG
+           50         149
+         50 BBBBBBBBBBB
+         59 BBBBBBBBBBB
+         60 RRRRRRRRRRR
+            R   red   R
+        139 RRRRRRRRRRR
+        140 GGGGGGGGGGG
+        149 GGGGGGGGGGG
         """
-        card = Image.new('RGB', (100, 200), color='red')
+        card = Image.new("RGB", (100, 200), color="red")
         for x in range(100):
             for y in range(20):
                 card.putpixel((x, y), self.BLUE)
         for x in range(100):
             for y in range(180, 200):
                 card.putpixel((x, y), self.GREEN)
-        back = Image.new('RGB', (100, 200), color='gray')
-        base = Image.new('RGB', (200, 200), color='white')
+        back = Image.new("RGB", (100, 200), color="gray")
+        base = Image.new("RGB", (200, 200), color="white")
 
         draw_card_layout(
             card_images=[card],
             single_back_image=back,
             base_image=base,
-            num_rows=1, num_cols=1,
-            x_pos=[50], y_pos=[50],
-            width=100, height=100,
+            num_rows=1,
+            num_cols=1,
+            x_pos=[50],
+            y_pos=[50],
+            width=100,
+            height=100,
             print_bleed=(0, 0),
-            crop=(0, 0), crop_backs=(0, 0),
-            ppi_ratio=1.0, extend_edges=0, extend_edges_backs=0, extend_corners_radius=0, extend_corners_backs_radius=0, extend_bleed=0,
-            flip=False, fit=FitMode.STRETCH, fit_backs=FitMode.STRETCH,
-            orientation=Orientation.PORTRAIT
+            crop=(0, 0),
+            crop_backs=(0, 0),
+            ppi_ratio=1.0,
+            extend_edges=0,
+            extend_edges_backs=0,
+            extend_corners_radius=0,
+            extend_corners_backs_radius=0,
+            extend_bleed=0,
+            flip=False,
+            fit=FitMode.STRETCH,
+            fit_backs=FitMode.STRETCH,
+            orientation=Orientation.PORTRAIT,
         )
         # Top edge should be blue (stretched but preserved)
         assert base.getpixel((80, 50)) == self.BLUE
@@ -1297,38 +1417,49 @@ class TestDrawCardLayout:
     def test_fit_crop_removes_tall_card_edges(self):
         """CROP on a tall card center-crops, removing top/bottom edges.
 
-        Card 100x200: blue 20px top, green 20px bottom, red center.
-        Target 100x100. CROP center-crops 50px from top and bottom.
+         Card 100x200: blue 20px top, green 20px bottom, red center.
+         Target 100x100. CROP center-crops 50px from top and bottom.
 
-        Cropped region is y=50..149 of original, all red.
+         Cropped region is y=50..149 of original, all red.
 
-          50         149
-        50 RRRRRRRRRRR
-           R   red   R
-       149 RRRRRRRRRRR
+           50         149
+         50 RRRRRRRRRRR
+            R   red   R
+        149 RRRRRRRRRRR
         """
-        card = Image.new('RGB', (100, 200), color='red')
+        card = Image.new("RGB", (100, 200), color="red")
         for x in range(100):
             for y in range(20):
                 card.putpixel((x, y), self.BLUE)
         for x in range(100):
             for y in range(180, 200):
                 card.putpixel((x, y), self.GREEN)
-        back = Image.new('RGB', (100, 200), color='gray')
-        base = Image.new('RGB', (200, 200), color='white')
+        back = Image.new("RGB", (100, 200), color="gray")
+        base = Image.new("RGB", (200, 200), color="white")
 
         draw_card_layout(
             card_images=[card],
             single_back_image=back,
             base_image=base,
-            num_rows=1, num_cols=1,
-            x_pos=[50], y_pos=[50],
-            width=100, height=100,
+            num_rows=1,
+            num_cols=1,
+            x_pos=[50],
+            y_pos=[50],
+            width=100,
+            height=100,
             print_bleed=(0, 0),
-            crop=(0, 0), crop_backs=(0, 0),
-            ppi_ratio=1.0, extend_edges=0, extend_edges_backs=0, extend_corners_radius=0, extend_corners_backs_radius=0, extend_bleed=0,
-            flip=False, fit=FitMode.CROP, fit_backs=FitMode.CROP,
-            orientation=Orientation.PORTRAIT
+            crop=(0, 0),
+            crop_backs=(0, 0),
+            ppi_ratio=1.0,
+            extend_edges=0,
+            extend_edges_backs=0,
+            extend_corners_radius=0,
+            extend_corners_backs_radius=0,
+            extend_bleed=0,
+            flip=False,
+            fit=FitMode.CROP,
+            fit_backs=FitMode.CROP,
+            orientation=Orientation.PORTRAIT,
         )
         # All edges should be red (blue/green sides were cropped off)
         assert base.getpixel((80, 50)) == self.RED
@@ -1354,25 +1485,36 @@ class TestDrawCardLayout:
 
         Edges of placed card should be blue.
         """
-        card = Image.new('RGB', (30, 30), color='blue')
+        card = Image.new("RGB", (30, 30), color="blue")
         for x in range(10, 20):
             for y in range(10, 20):
                 card.putpixel((x, y), (255, 0, 0))
-        back = Image.new('RGB', (30, 30), color='gray')
-        base = Image.new('RGB', (60, 60), color='white')
+        back = Image.new("RGB", (30, 30), color="gray")
+        base = Image.new("RGB", (60, 60), color="white")
 
         draw_card_layout(
             card_images=[card],
             single_back_image=back,
             base_image=base,
-            num_rows=1, num_cols=1,
-            x_pos=[15], y_pos=[15],
-            width=30, height=30,
+            num_rows=1,
+            num_cols=1,
+            x_pos=[15],
+            y_pos=[15],
+            width=30,
+            height=30,
             print_bleed=(0, 0),
-            crop=(0, 0), crop_backs=(0, 0),
-            ppi_ratio=1.0, extend_edges=0, extend_edges_backs=0, extend_corners_radius=0, extend_corners_backs_radius=0, extend_bleed=0,
-            flip=False, fit=FitMode.STRETCH, fit_backs=FitMode.STRETCH,
-            orientation=Orientation.PORTRAIT
+            crop=(0, 0),
+            crop_backs=(0, 0),
+            ppi_ratio=1.0,
+            extend_edges=0,
+            extend_edges_backs=0,
+            extend_corners_radius=0,
+            extend_corners_backs_radius=0,
+            extend_bleed=0,
+            flip=False,
+            fit=FitMode.STRETCH,
+            fit_backs=FitMode.STRETCH,
+            orientation=Orientation.PORTRAIT,
         )
         # Edges of card should be blue (border preserved)
         assert base.getpixel((15, 15)) == self.BLUE
@@ -1401,25 +1543,36 @@ class TestDrawCardLayout:
 
         Edges should now be red (blue border was trimmed).
         """
-        card = Image.new('RGB', (30, 30), color='blue')
+        card = Image.new("RGB", (30, 30), color="blue")
         for x in range(10, 20):
             for y in range(10, 20):
                 card.putpixel((x, y), (255, 0, 0))
-        back = Image.new('RGB', (30, 30), color='gray')
-        base = Image.new('RGB', (60, 60), color='white')
+        back = Image.new("RGB", (30, 30), color="gray")
+        base = Image.new("RGB", (60, 60), color="white")
 
         draw_card_layout(
             card_images=[card],
             single_back_image=back,
             base_image=base,
-            num_rows=1, num_cols=1,
-            x_pos=[15], y_pos=[15],
-            width=30, height=30,
+            num_rows=1,
+            num_cols=1,
+            x_pos=[15],
+            y_pos=[15],
+            width=30,
+            height=30,
             print_bleed=(0, 0),
-            crop=(0, 0), crop_backs=(0, 0),
-            ppi_ratio=1.0, extend_edges=10, extend_edges_backs=0, extend_corners_radius=0, extend_corners_backs_radius=0, extend_bleed=0,
-            flip=False, fit=FitMode.STRETCH, fit_backs=FitMode.STRETCH,
-            orientation=Orientation.PORTRAIT
+            crop=(0, 0),
+            crop_backs=(0, 0),
+            ppi_ratio=1.0,
+            extend_edges=10,
+            extend_edges_backs=0,
+            extend_corners_radius=0,
+            extend_corners_backs_radius=0,
+            extend_bleed=0,
+            flip=False,
+            fit=FitMode.STRETCH,
+            fit_backs=FitMode.STRETCH,
+            orientation=Orientation.PORTRAIT,
         )
         # Card area (25,25)-(34,34) should be red (border trimmed)
         assert base.getpixel((25, 25)) == self.RED
@@ -1445,65 +1598,93 @@ class TestDrawCardLayout:
         - Left column: extended left edge (x=0 to x=9, clamped from x=-5)
         - Right column: extended right edge (x=250 to x=264)
         """
-        red_card = Image.new('RGB', (100, 140), color='red')
-        blue_card = Image.new('RGB', (100, 140), color='blue')
-        green_card = Image.new('RGB', (100, 140), color='green')
-        yellow_card = Image.new('RGB', (100, 140), color='yellow')
-        back = Image.new('RGB', (100, 140), color='gray')
-        base = Image.new('RGB', (300, 400), color='white')
+        red_card = Image.new("RGB", (100, 140), color="red")
+        blue_card = Image.new("RGB", (100, 140), color="blue")
+        green_card = Image.new("RGB", (100, 140), color="green")
+        yellow_card = Image.new("RGB", (100, 140), color="yellow")
+        back = Image.new("RGB", (100, 140), color="gray")
+        base = Image.new("RGB", (300, 400), color="white")
 
         draw_card_layout(
             card_images=[red_card, blue_card, green_card, yellow_card],
             single_back_image=back,
             base_image=base,
-            num_rows=2, num_cols=2,
-            x_pos=[10, 150], y_pos=[20, 200],
-            width=100, height=140,
+            num_rows=2,
+            num_cols=2,
+            x_pos=[10, 150],
+            y_pos=[20, 200],
+            width=100,
+            height=140,
             print_bleed=(5, 5),
-            crop=(0, 0), crop_backs=(0, 0),
-            ppi_ratio=1.0, extend_edges=0, extend_edges_backs=0, extend_corners_radius=0, extend_corners_backs_radius=0, extend_bleed=10,
-            flip=False, fit=FitMode.STRETCH, fit_backs=FitMode.STRETCH,
-            orientation=Orientation.PORTRAIT
+            crop=(0, 0),
+            crop_backs=(0, 0),
+            ppi_ratio=1.0,
+            extend_edges=0,
+            extend_edges_backs=0,
+            extend_corners_radius=0,
+            extend_corners_backs_radius=0,
+            extend_bleed=10,
+            flip=False,
+            fit=FitMode.STRETCH,
+            fit_backs=FitMode.STRETCH,
+            orientation=Orientation.PORTRAIT,
         )
 
         # Top-left card (red): extended top and left
-        assert base.getpixel((10, 5)) == self.RED      # Extended top bleed start
-        assert base.getpixel((10, 19)) == self.RED     # Extended top bleed end
-        assert base.getpixel((0, 20)) == self.RED      # Extended left bleed (clamped from x=-5)
+        assert base.getpixel((10, 5)) == self.RED  # Extended top bleed start
+        assert base.getpixel((10, 19)) == self.RED  # Extended top bleed end
+        assert (
+            base.getpixel((0, 20)) == self.RED
+        )  # Extended left bleed (clamped from x=-5)
 
         # Top-right card (blue): extended top and right
-        assert base.getpixel((150, 5)) == self.BLUE    # Extended top bleed start
-        assert base.getpixel((150, 19)) == self.BLUE   # Extended top bleed end
-        assert base.getpixel((264, 20)) == self.BLUE   # Extended right bleed end (x=250+14)
+        assert base.getpixel((150, 5)) == self.BLUE  # Extended top bleed start
+        assert base.getpixel((150, 19)) == self.BLUE  # Extended top bleed end
+        assert (
+            base.getpixel((264, 20)) == self.BLUE
+        )  # Extended right bleed end (x=250+14)
 
         # Bottom-left card (green): extended bottom and left
-        assert base.getpixel((10, 354)) == self.GREEN  # Extended bottom bleed end (y=340+14)
+        assert (
+            base.getpixel((10, 354)) == self.GREEN
+        )  # Extended bottom bleed end (y=340+14)
         assert base.getpixel((10, 355)) == self.WHITE  # Outside extended bleed
-        assert base.getpixel((0, 200)) == self.GREEN   # Extended left bleed (clamped)
+        assert base.getpixel((0, 200)) == self.GREEN  # Extended left bleed (clamped)
 
         # Bottom-right card (yellow): extended bottom and right
         assert base.getpixel((150, 354)) == self.YELLOW  # Extended bottom bleed end
-        assert base.getpixel((150, 355)) == self.WHITE   # Outside extended bleed
+        assert base.getpixel((150, 355)) == self.WHITE  # Outside extended bleed
         assert base.getpixel((264, 200)) == self.YELLOW  # Extended right bleed end
 
     def test_extend_bleed_zero_no_extra_bleed(self):
         """extend_bleed=0 should behave the same as not having the feature."""
-        card = Image.new('RGB', (100, 140), color='red')
-        back = Image.new('RGB', (100, 140), color='blue')
-        base = Image.new('RGB', (300, 400), color='white')
+        card = Image.new("RGB", (100, 140), color="red")
+        back = Image.new("RGB", (100, 140), color="blue")
+        base = Image.new("RGB", (300, 400), color="white")
 
         draw_card_layout(
             card_images=[card],
             single_back_image=back,
             base_image=base,
-            num_rows=1, num_cols=1,
-            x_pos=[50], y_pos=[50],
-            width=100, height=140,
+            num_rows=1,
+            num_cols=1,
+            x_pos=[50],
+            y_pos=[50],
+            width=100,
+            height=140,
             print_bleed=(10, 10),
-            crop=(0, 0), crop_backs=(0, 0),
-            ppi_ratio=1.0, extend_edges=0, extend_edges_backs=0, extend_corners_radius=0, extend_corners_backs_radius=0, extend_bleed=0,
-            flip=False, fit=FitMode.STRETCH, fit_backs=FitMode.STRETCH,
-            orientation=Orientation.PORTRAIT
+            crop=(0, 0),
+            crop_backs=(0, 0),
+            ppi_ratio=1.0,
+            extend_edges=0,
+            extend_edges_backs=0,
+            extend_corners_radius=0,
+            extend_corners_backs_radius=0,
+            extend_bleed=0,
+            flip=False,
+            fit=FitMode.STRETCH,
+            fit_backs=FitMode.STRETCH,
+            orientation=Orientation.PORTRAIT,
         )
 
         # Card at (50, 50), size 100x140, normal bleed 10px
@@ -1517,23 +1698,34 @@ class TestDrawCardLayout:
 
     def test_extend_bleed_center_cards_no_extra(self):
         """Center cards in a 3x3 grid should not get extended bleed."""
-        cards = [Image.new('RGB', (50, 70), color='red') for _ in range(9)]
-        cards[4] = Image.new('RGB', (50, 70), color='blue')  # Center card
-        back = Image.new('RGB', (50, 70), color='gray')
-        base = Image.new('RGB', (300, 400), color='white')
+        cards = [Image.new("RGB", (50, 70), color="red") for _ in range(9)]
+        cards[4] = Image.new("RGB", (50, 70), color="blue")  # Center card
+        back = Image.new("RGB", (50, 70), color="gray")
+        base = Image.new("RGB", (300, 400), color="white")
 
         draw_card_layout(
             card_images=cards,
             single_back_image=back,
             base_image=base,
-            num_rows=3, num_cols=3,
-            x_pos=[10, 80, 150], y_pos=[10, 100, 190],
-            width=50, height=70,
+            num_rows=3,
+            num_cols=3,
+            x_pos=[10, 80, 150],
+            y_pos=[10, 100, 190],
+            width=50,
+            height=70,
             print_bleed=(5, 5),
-            crop=(0, 0), crop_backs=(0, 0),
-            ppi_ratio=1.0, extend_edges=0, extend_edges_backs=0, extend_corners_radius=0, extend_corners_backs_radius=0, extend_bleed=10,
-            flip=False, fit=FitMode.STRETCH, fit_backs=FitMode.STRETCH,
-            orientation=Orientation.PORTRAIT
+            crop=(0, 0),
+            crop_backs=(0, 0),
+            ppi_ratio=1.0,
+            extend_edges=0,
+            extend_edges_backs=0,
+            extend_corners_radius=0,
+            extend_corners_backs_radius=0,
+            extend_bleed=10,
+            flip=False,
+            fit=FitMode.STRETCH,
+            fit_backs=FitMode.STRETCH,
+            orientation=Orientation.PORTRAIT,
         )
 
         # Center card (blue) is at row=1, col=1, position (80, 100)
@@ -1548,22 +1740,33 @@ class TestDrawCardLayout:
 
     def test_extend_bleed_single_card_all_edges_extended(self):
         """A single card (1x1 grid) should get extended bleed on all four edges."""
-        card = Image.new('RGB', (100, 140), color='red')
-        back = Image.new('RGB', (100, 140), color='blue')
-        base = Image.new('RGB', (300, 400), color='white')
+        card = Image.new("RGB", (100, 140), color="red")
+        back = Image.new("RGB", (100, 140), color="blue")
+        base = Image.new("RGB", (300, 400), color="white")
 
         draw_card_layout(
             card_images=[card],
             single_back_image=back,
             base_image=base,
-            num_rows=1, num_cols=1,
-            x_pos=[50], y_pos=[50],
-            width=100, height=140,
+            num_rows=1,
+            num_cols=1,
+            x_pos=[50],
+            y_pos=[50],
+            width=100,
+            height=140,
             print_bleed=(5, 5),
-            crop=(0, 0), crop_backs=(0, 0),
-            ppi_ratio=1.0, extend_edges=0, extend_edges_backs=0, extend_corners_radius=0, extend_corners_backs_radius=0, extend_bleed=10,
-            flip=False, fit=FitMode.STRETCH, fit_backs=FitMode.STRETCH,
-            orientation=Orientation.PORTRAIT
+            crop=(0, 0),
+            crop_backs=(0, 0),
+            ppi_ratio=1.0,
+            extend_edges=0,
+            extend_edges_backs=0,
+            extend_corners_radius=0,
+            extend_corners_backs_radius=0,
+            extend_bleed=10,
+            flip=False,
+            fit=FitMode.STRETCH,
+            fit_backs=FitMode.STRETCH,
+            orientation=Orientation.PORTRAIT,
         )
 
         # Single card is both first and last row/col, so all edges extended
@@ -1592,7 +1795,7 @@ class TestExtraLayoutPaths:
 
     def write_json(self, tmpdir, name, data=None):
         path = Path(tmpdir) / name
-        with open(path, 'w') as f:
+        with open(path, "w") as f:
             json.dump(data or {}, f)
         return path
 
@@ -1606,7 +1809,10 @@ class TestExtraLayoutPaths:
             EXTRA_LAYOUTS_PATH = original_dir
 
     def test_dir_files_sorted_before_env_files(self):
-        with tempfile.TemporaryDirectory() as dir_tmpdir, tempfile.TemporaryDirectory() as env_tmpdir:
+        with (
+            tempfile.TemporaryDirectory() as dir_tmpdir,
+            tempfile.TemporaryDirectory() as env_tmpdir,
+        ):
             b_path = self.write_json(dir_tmpdir, "b.json")
             a_path = self.write_json(dir_tmpdir, "a.json")
             env_path = self.write_json(env_tmpdir, "c.json")
@@ -1626,18 +1832,26 @@ class TestFindExtraLayoutOwner:
 
     def write_json(self, tmpdir, name, data):
         path = Path(tmpdir) / name
-        with open(path, 'w') as f:
+        with open(path, "w") as f:
             json.dump(data, f)
         return path
 
     def test_finds_defining_file_among_several(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            mtg_path = self.write_json(tmpdir, "a-mtg.json", {
-                "card_sizes": {"mtg": {"width": "2.5in", "height": "3.5in"}},
-            })
-            sorcery_path = self.write_json(tmpdir, "b-sorcery.json", {
-                "card_sizes": {"sorcery": {"width": "2.61in", "height": "3.74in"}},
-            })
+            mtg_path = self.write_json(
+                tmpdir,
+                "a-mtg.json",
+                {
+                    "card_sizes": {"mtg": {"width": "2.5in", "height": "3.5in"}},
+                },
+            )
+            sorcery_path = self.write_json(
+                tmpdir,
+                "b-sorcery.json",
+                {
+                    "card_sizes": {"sorcery": {"width": "2.61in", "height": "3.74in"}},
+                },
+            )
             original_dir = EXTRA_LAYOUTS_PATH
             EXTRA_LAYOUTS_PATH = Path(tmpdir)
             try:
@@ -1648,9 +1862,13 @@ class TestFindExtraLayoutOwner:
 
     def test_returns_none_when_not_found(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            self.write_json(tmpdir, "a.json", {
-                "card_sizes": {"mtg": {"width": "2.5in", "height": "3.5in"}},
-            })
+            self.write_json(
+                tmpdir,
+                "a.json",
+                {
+                    "card_sizes": {"mtg": {"width": "2.5in", "height": "3.5in"}},
+                },
+            )
             original_dir = EXTRA_LAYOUTS_PATH
             EXTRA_LAYOUTS_PATH = Path(tmpdir)
             try:
@@ -1666,12 +1884,16 @@ class TestMergeExtraLayouts:
         return {
             "card_sizes": {"poker": {"width": "2.5in", "height": "3.5in"}},
             "paper_sizes": {"letter": {"width": "11in", "height": "8.5in"}},
-            "layouts": {"letter": {"poker": {"default": {"orientation": "landscape", "version": 1}}}},
+            "layouts": {
+                "letter": {
+                    "poker": {"default": {"orientation": "landscape", "version": 1}}
+                }
+            },
         }
 
     def write_extra_file(self, tmpdir, name, data):
         path = Path(tmpdir) / name
-        with open(path, 'w') as f:
+        with open(path, "w") as f:
             json.dump(data, f)
         return str(path)
 
@@ -1683,36 +1905,66 @@ class TestMergeExtraLayouts:
 
     def test_merges_new_card_size(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            extra_path = self.write_extra_file(tmpdir, "extra.json", {
-                "card_sizes": {"mtg": {"width": "2.5in", "height": "3.5in"}},
-            })
+            extra_path = self.write_extra_file(
+                tmpdir,
+                "extra.json",
+                {
+                    "card_sizes": {"mtg": {"width": "2.5in", "height": "3.5in"}},
+                },
+            )
             os.environ[EXTRA_LAYOUTS_ENV] = extra_path
             try:
                 config = merge_extra_layouts(self.base_config())
-                assert config["card_sizes"]["mtg"] == {"width": "2.5in", "height": "3.5in"}
-                assert config["card_sizes"]["poker"] == {"width": "2.5in", "height": "3.5in"}
+                assert config["card_sizes"]["mtg"] == {
+                    "width": "2.5in",
+                    "height": "3.5in",
+                }
+                assert config["card_sizes"]["poker"] == {
+                    "width": "2.5in",
+                    "height": "3.5in",
+                }
             finally:
                 del os.environ[EXTRA_LAYOUTS_ENV]
 
     def test_merges_new_layout_entry(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            extra_path = self.write_extra_file(tmpdir, "extra.json", {
-                "layouts": {"letter": {"mtg": {"default": {"orientation": "portrait", "version": 1}}}},
-            })
+            extra_path = self.write_extra_file(
+                tmpdir,
+                "extra.json",
+                {
+                    "layouts": {
+                        "letter": {
+                            "mtg": {
+                                "default": {"orientation": "portrait", "version": 1}
+                            }
+                        }
+                    },
+                },
+            )
             os.environ[EXTRA_LAYOUTS_ENV] = extra_path
             try:
                 config = merge_extra_layouts(self.base_config())
-                assert config["layouts"]["letter"]["mtg"]["default"]["orientation"] == "portrait"
+                assert (
+                    config["layouts"]["letter"]["mtg"]["default"]["orientation"]
+                    == "portrait"
+                )
                 # Existing entry untouched
-                assert config["layouts"]["letter"]["poker"]["default"]["orientation"] == "landscape"
+                assert (
+                    config["layouts"]["letter"]["poker"]["default"]["orientation"]
+                    == "landscape"
+                )
             finally:
                 del os.environ[EXTRA_LAYOUTS_ENV]
 
     def test_card_size_collision_raises(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            extra_path = self.write_extra_file(tmpdir, "extra.json", {
-                "card_sizes": {"poker": {"width": "1in", "height": "1in"}},
-            })
+            extra_path = self.write_extra_file(
+                tmpdir,
+                "extra.json",
+                {
+                    "card_sizes": {"poker": {"width": "1in", "height": "1in"}},
+                },
+            )
             os.environ[EXTRA_LAYOUTS_ENV] = extra_path
             try:
                 with pytest.raises(ValueError):
@@ -1722,9 +1974,19 @@ class TestMergeExtraLayouts:
 
     def test_layout_collision_raises(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            extra_path = self.write_extra_file(tmpdir, "extra.json", {
-                "layouts": {"letter": {"poker": {"default": {"orientation": "portrait", "version": 1}}}},
-            })
+            extra_path = self.write_extra_file(
+                tmpdir,
+                "extra.json",
+                {
+                    "layouts": {
+                        "letter": {
+                            "poker": {
+                                "default": {"orientation": "portrait", "version": 1}
+                            }
+                        }
+                    },
+                },
+            )
             os.environ[EXTRA_LAYOUTS_ENV] = extra_path
             try:
                 with pytest.raises(ValueError):
@@ -1734,12 +1996,20 @@ class TestMergeExtraLayouts:
 
     def test_multiple_files_merge_in_order(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            path_a = self.write_extra_file(tmpdir, "a.json", {
-                "card_sizes": {"mtg": {"width": "2.5in", "height": "3.5in"}},
-            })
-            path_b = self.write_extra_file(tmpdir, "b.json", {
-                "card_sizes": {"sorcery": {"width": "2.61in", "height": "3.74in"}},
-            })
+            path_a = self.write_extra_file(
+                tmpdir,
+                "a.json",
+                {
+                    "card_sizes": {"mtg": {"width": "2.5in", "height": "3.5in"}},
+                },
+            )
+            path_b = self.write_extra_file(
+                tmpdir,
+                "b.json",
+                {
+                    "card_sizes": {"sorcery": {"width": "2.61in", "height": "3.74in"}},
+                },
+            )
             os.environ[EXTRA_LAYOUTS_ENV] = os.pathsep.join([path_a, path_b])
             try:
                 config = merge_extra_layouts(self.base_config())
@@ -1750,14 +2020,21 @@ class TestMergeExtraLayouts:
 
     def test_scans_extra_layouts_dir(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            self.write_extra_file(tmpdir, "a.json", {
-                "card_sizes": {"mtg": {"width": "2.5in", "height": "3.5in"}},
-            })
+            self.write_extra_file(
+                tmpdir,
+                "a.json",
+                {
+                    "card_sizes": {"mtg": {"width": "2.5in", "height": "3.5in"}},
+                },
+            )
             original_dir = EXTRA_LAYOUTS_PATH
             EXTRA_LAYOUTS_PATH = Path(tmpdir)
             try:
                 config = merge_extra_layouts(self.base_config())
-                assert config["card_sizes"]["mtg"] == {"width": "2.5in", "height": "3.5in"}
+                assert config["card_sizes"]["mtg"] == {
+                    "width": "2.5in",
+                    "height": "3.5in",
+                }
             finally:
                 EXTRA_LAYOUTS_PATH = original_dir
 
@@ -1773,9 +2050,13 @@ class TestMergeExtraLayouts:
 
     def test_dir_file_collision_raises(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            self.write_extra_file(tmpdir, "a.json", {
-                "card_sizes": {"poker": {"width": "1in", "height": "1in"}},
-            })
+            self.write_extra_file(
+                tmpdir,
+                "a.json",
+                {
+                    "card_sizes": {"poker": {"width": "1in", "height": "1in"}},
+                },
+            )
             original_dir = EXTRA_LAYOUTS_PATH
             EXTRA_LAYOUTS_PATH = Path(tmpdir)
             try:
@@ -1785,13 +2066,24 @@ class TestMergeExtraLayouts:
                 EXTRA_LAYOUTS_PATH = original_dir
 
     def test_dir_files_merge_before_env_var_files(self):
-        with tempfile.TemporaryDirectory() as dir_tmpdir, tempfile.TemporaryDirectory() as env_tmpdir:
-            self.write_extra_file(dir_tmpdir, "a.json", {
-                "card_sizes": {"mtg": {"width": "2.5in", "height": "3.5in"}},
-            })
-            env_path = self.write_extra_file(env_tmpdir, "b.json", {
-                "card_sizes": {"sorcery": {"width": "2.61in", "height": "3.74in"}},
-            })
+        with (
+            tempfile.TemporaryDirectory() as dir_tmpdir,
+            tempfile.TemporaryDirectory() as env_tmpdir,
+        ):
+            self.write_extra_file(
+                dir_tmpdir,
+                "a.json",
+                {
+                    "card_sizes": {"mtg": {"width": "2.5in", "height": "3.5in"}},
+                },
+            )
+            env_path = self.write_extra_file(
+                env_tmpdir,
+                "b.json",
+                {
+                    "card_sizes": {"sorcery": {"width": "2.61in", "height": "3.74in"}},
+                },
+            )
             original_dir = EXTRA_LAYOUTS_PATH
             EXTRA_LAYOUTS_PATH = Path(dir_tmpdir)
             os.environ[EXTRA_LAYOUTS_ENV] = env_path
@@ -1812,16 +2104,23 @@ class TestAddFrontBackPages:
 
         pages[] -> [front, back]
         """
-        front = Image.new('RGB', (300, 400), color='white')
-        back = Image.new('RGB', (300, 400), color='white')
+        front = Image.new("RGB", (300, 400), color="white")
+        back = Image.new("RGB", (300, 400), color="white")
         pages = []
 
         add_front_back_pages(
-            front, back, pages,
-            page_width=300, page_height=400,
-            ppi_ratio=1.0, template='test_v1',
-            only_fronts=False, label=None,
-            orientation=Orientation.LANDSCAPE, label_margin_px=10, borderless=False
+            front,
+            back,
+            pages,
+            page_width=300,
+            page_height=400,
+            ppi_ratio=1.0,
+            template="test_v1",
+            only_fronts=False,
+            label=None,
+            orientation=Orientation.LANDSCAPE,
+            label_margin_px=10,
+            borderless=False,
         )
         assert len(pages) == 2
         assert pages[0].size == front.size
@@ -1832,16 +2131,23 @@ class TestAddFrontBackPages:
 
         pages[] -> [front]
         """
-        front = Image.new('RGB', (300, 400), color='white')
-        back = Image.new('RGB', (300, 400), color='white')
+        front = Image.new("RGB", (300, 400), color="white")
+        back = Image.new("RGB", (300, 400), color="white")
         pages = []
 
         add_front_back_pages(
-            front, back, pages,
-            page_width=300, page_height=400,
-            ppi_ratio=1.0, template='test_v1',
-            only_fronts=True, label=None,
-            orientation=Orientation.LANDSCAPE, label_margin_px=10, borderless=False
+            front,
+            back,
+            pages,
+            page_width=300,
+            page_height=400,
+            ppi_ratio=1.0,
+            template="test_v1",
+            only_fronts=True,
+            label=None,
+            orientation=Orientation.LANDSCAPE,
+            label_margin_px=10,
+            borderless=False,
         )
         assert len(pages) == 1
         assert pages[0].size == front.size
@@ -1852,25 +2158,39 @@ class TestAddFrontBackPages:
         Call 1: pages[] -> [front1, back1]
         Call 2: pages[] -> [front1, back1, front2, back2]
         """
-        front1 = Image.new('RGB', (300, 400), color='white')
-        back1 = Image.new('RGB', (300, 400), color='white')
-        front2 = Image.new('RGB', (300, 400), color='white')
-        back2 = Image.new('RGB', (300, 400), color='white')
+        front1 = Image.new("RGB", (300, 400), color="white")
+        back1 = Image.new("RGB", (300, 400), color="white")
+        front2 = Image.new("RGB", (300, 400), color="white")
+        back2 = Image.new("RGB", (300, 400), color="white")
         pages = []
 
         add_front_back_pages(
-            front1, back1, pages,
-            page_width=300, page_height=400,
-            ppi_ratio=1.0, template='test_v1',
-            only_fronts=False, label=None,
-            orientation=Orientation.PORTRAIT, label_margin_px=10, borderless=False
+            front1,
+            back1,
+            pages,
+            page_width=300,
+            page_height=400,
+            ppi_ratio=1.0,
+            template="test_v1",
+            only_fronts=False,
+            label=None,
+            orientation=Orientation.PORTRAIT,
+            label_margin_px=10,
+            borderless=False,
         )
         add_front_back_pages(
-            front2, back2, pages,
-            page_width=300, page_height=400,
-            ppi_ratio=1.0, template='test_v1',
-            only_fronts=False, label=None,
-            orientation=Orientation.PORTRAIT, label_margin_px=10, borderless=False
+            front2,
+            back2,
+            pages,
+            page_width=300,
+            page_height=400,
+            ppi_ratio=1.0,
+            template="test_v1",
+            only_fronts=False,
+            label=None,
+            orientation=Orientation.PORTRAIT,
+            label_margin_px=10,
+            borderless=False,
         )
         assert len(pages) == 4
 
@@ -1879,16 +2199,22 @@ class TestAddFrontBackPages:
 
         pages[] -> [front, back]  (with name='my_deck')
         """
-        front = Image.new('RGB', (300, 400), color='white')
-        back = Image.new('RGB', (300, 400), color='white')
+        front = Image.new("RGB", (300, 400), color="white")
+        back = Image.new("RGB", (300, 400), color="white")
         pages = []
 
         add_front_back_pages(
-            front, back, pages,
-            page_width=300, page_height=400,
-            ppi_ratio=1.0, template='test_v1',
-            only_fronts=False, label='my_deck',
-            orientation=Orientation.PORTRAIT, label_margin_px=10, borderless=False
+            front,
+            back,
+            pages,
+            page_width=300,
+            page_height=400,
+            ppi_ratio=1.0,
+            template="test_v1",
+            only_fronts=False,
+            label="my_deck",
+            orientation=Orientation.PORTRAIT,
+            label_margin_px=10,
+            borderless=False,
         )
         assert len(pages) == 2
-
