@@ -46,8 +46,8 @@ from src.layouts import (
     resolve_cutting_templates_dir,
 )
 from src import measurements
-import page_manager
-from page_manager import BORDERLESS_EXPANSION_MM
+from src import page_manager
+from src.page_manager import BORDERLESS_EXPANSION_MM
 
 # Platform check - this script only works on Windows
 if platform.system() != "Windows":

@@ -25,8 +25,8 @@ from pathlib import Path
 
 import click
 
-import page_manager
-from page_manager import BORDERLESS_EXPANSION_MM
+from src import page_manager
+from src.page_manager import BORDERLESS_EXPANSION_MM
 import dxf_manager
 from src import measurements
 from src.enums import Orientation, OrientationMode, Variant

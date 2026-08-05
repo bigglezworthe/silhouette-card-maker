@@ -8,7 +8,7 @@ import os
 
 from natsort import natsorted
 
-import page_manager
+from src import page_manager
 
 from pathlib import Path
 from PIL import Image, ImageFont, ImageDraw
