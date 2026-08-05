@@ -187,21 +187,22 @@ def generate_pdf(
     # ==============================
     f_path = Path(front_dir_path)
     if not f_path.is_dir():
-        raise Exception(f"Invalid front image directory: {f_path}")
+        raise FileNotFoundError(f"Invalid front image directory: {f_path}")
     b_path = Path(back_dir_path)
     if not b_path.is_dir():
-        raise Exception(f"Invalid back image directory: {b_path}")
+        raise FileNotFoundError(f"Invalid back image directory: {b_path}")
     ds_path = Path(ds_dir_path)
     if not ds_path.is_dir():
-        raise Exception(f"Invalid double-sided image directory: {ds_path}")
+        raise FileNotFoundError(f"Invalid double-sided image directory: {ds_path}")
 
     o_path = Path(output_path)
     if output_images:
         o_path = get_directory(o_path)
     else:
         if not o_path.name.lower().endswith(".pdf"):
-            raise Exception(f"Invalid PDF output path: {o_path}")
+            raise FileNotFoundError(f"Invalid PDF output path: {o_path}")
         ensure_output_directory_exists(o_path)
+    output_path = str(o_path)
 
     back_card_image_path = None
     use_default_back_page = True
