@@ -19,7 +19,6 @@ data
 images/*.xcf
 
 test/*/output/*
-test/expected_pdfs
 !test/*/output/README.md
 
 # DXF files are generated artifacts, only commit .studio3 files
