@@ -126,7 +126,7 @@ def draw_card_layout(
         row = (i % num_cards) // num_cols
 
         if flip:
-            if orientation == Orientation.LANDSCAPE:
+            if orientation == Orientation.PORTRAIT:
                 col = num_cols - col - 1
             else:
                 row = num_rows - row - 1
