@@ -152,18 +152,18 @@ def merge_extra_layouts(raw_config: dict[str, Any]) -> dict[str, Any]:
                     raise ValueError(f"'{key}' in {section} of {path} already defined.")
                 raw_config[section][key] = value
 
-            for paper, cards in extra.get("layouts", {}).items():
-                for card, variants in cards.items():
-                    for variant, layout_def in variants.items():
-                        if variant in raw_config["layouts"].get(paper, {}).get(
-                            card, {}
-                        ):
-                            raise ValueError(
-                                f"Layout '{paper}'/'{variant}' in {path} already defined."
-                            )
-                        raw_config["layouts"].setdefault(paper, {}).setdefault(
-                            card, {}
-                        )[variant] = layout_def
+        for paper, cards in extra.get("layouts", {}).items():
+            for card, variants in cards.items():
+                for variant, layout_def in variants.items():
+                    if variant in raw_config["layouts"].get(paper, {}).get(
+                        card, {}
+                    ):
+                        raise ValueError(
+                            f"Layout '{paper}'/'{variant}' in {path} already defined."
+                        )
+                    raw_config["layouts"].setdefault(paper, {}).setdefault(
+                        card, {}
+                    )[variant] = layout_def
     return raw_config
 
 

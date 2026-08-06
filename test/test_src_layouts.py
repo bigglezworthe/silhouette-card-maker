@@ -4,15 +4,16 @@ import tempfile
 import os
 import json
 
+from src import layouts # Allows assingment of EXTRA_LAYOUTS_PATH
 from src.layouts import (
     EXTRA_LAYOUTS_ENV,
-    EXTRA_LAYOUTS_PATH,
     extra_layout_paths,
     find_extra_layout_owner,
     merge_extra_layouts,
 )
 
 from pathlib import Path
+
 
 
 class TestExtraLayoutPaths:
@@ -26,12 +27,12 @@ class TestExtraLayoutPaths:
 
     def test_empty_when_nothing_configured(self):
         os.environ.pop(EXTRA_LAYOUTS_ENV, None)
-        original_dir = EXTRA_LAYOUTS_PATH
-        EXTRA_LAYOUTS_PATH = Path(tempfile.gettempdir()) / "scm-test-nonexistent-dir"
+        original_dir = layouts.EXTRA_LAYOUTS_PATH
+        layouts.EXTRA_LAYOUTS_PATH = Path(tempfile.gettempdir()) / "scm-test-nonexistent-dir"
         try:
             assert extra_layout_paths() == []
         finally:
-            EXTRA_LAYOUTS_PATH = original_dir
+            layouts.EXTRA_LAYOUTS_PATH = original_dir
 
     def test_dir_files_sorted_before_env_files(self):
         with (
@@ -42,13 +43,13 @@ class TestExtraLayoutPaths:
             a_path = self.write_json(dir_tmpdir, "a.json")
             env_path = self.write_json(env_tmpdir, "c.json")
 
-            original_dir = EXTRA_LAYOUTS_PATH
-            EXTRA_LAYOUTS_PATH = Path(dir_tmpdir)
+            original_dir = layouts.EXTRA_LAYOUTS_PATH
+            layouts.EXTRA_LAYOUTS_PATH = Path(dir_tmpdir)
             os.environ[EXTRA_LAYOUTS_ENV] = str(env_path)
             try:
                 assert extra_layout_paths() == [a_path, b_path, env_path]
             finally:
-                EXTRA_LAYOUTS_PATH = original_dir
+                layouts.EXTRA_LAYOUTS_PATH = original_dir
                 del os.environ[EXTRA_LAYOUTS_ENV]
 
 
@@ -77,13 +78,13 @@ class TestFindExtraLayoutOwner:
                     "card_sizes": {"sorcery": {"width": "2.61in", "height": "3.74in"}},
                 },
             )
-            original_dir = EXTRA_LAYOUTS_PATH
-            EXTRA_LAYOUTS_PATH = Path(tmpdir)
+            original_dir = layouts.EXTRA_LAYOUTS_PATH
+            layouts.EXTRA_LAYOUTS_PATH = Path(tmpdir)
             try:
                 assert find_extra_layout_owner("card_sizes", "sorcery") == sorcery_path
                 assert find_extra_layout_owner("card_sizes", "mtg") == mtg_path
             finally:
-                EXTRA_LAYOUTS_PATH = original_dir
+                layouts.EXTRA_LAYOUTS_PATH = original_dir
 
     def test_returns_none_when_not_found(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -94,12 +95,12 @@ class TestFindExtraLayoutOwner:
                     "card_sizes": {"mtg": {"width": "2.5in", "height": "3.5in"}},
                 },
             )
-            original_dir = EXTRA_LAYOUTS_PATH
-            EXTRA_LAYOUTS_PATH = Path(tmpdir)
+            original_dir = layouts.EXTRA_LAYOUTS_PATH
+            layouts.EXTRA_LAYOUTS_PATH = Path(tmpdir)
             try:
                 assert find_extra_layout_owner("card_sizes", "nonexistent") is None
             finally:
-                EXTRA_LAYOUTS_PATH = original_dir
+                layouts.EXTRA_LAYOUTS_PATH = original_dir
 
 
 class TestMergeExtraLayouts:
@@ -252,8 +253,8 @@ class TestMergeExtraLayouts:
                     "card_sizes": {"mtg": {"width": "2.5in", "height": "3.5in"}},
                 },
             )
-            original_dir = EXTRA_LAYOUTS_PATH
-            EXTRA_LAYOUTS_PATH = Path(tmpdir)
+            original_dir = layouts.EXTRA_LAYOUTS_PATH
+            layouts.EXTRA_LAYOUTS_PATH = Path(tmpdir)
             try:
                 config = merge_extra_layouts(self.base_config())
                 assert config["card_sizes"]["mtg"] == {
@@ -261,17 +262,17 @@ class TestMergeExtraLayouts:
                     "height": "3.5in",
                 }
             finally:
-                EXTRA_LAYOUTS_PATH = original_dir
+                layouts.EXTRA_LAYOUTS_PATH = original_dir
 
     def test_missing_extra_layouts_dir_is_noop(self):
         os.environ.pop(EXTRA_LAYOUTS_ENV, None)
-        original_dir = EXTRA_LAYOUTS_PATH
-        EXTRA_LAYOUTS_PATH = Path(tempfile.gettempdir()) / "scm-test-nonexistent-dir"
+        original_dir = layouts.EXTRA_LAYOUTS_PATH
+        layouts.EXTRA_LAYOUTS_PATH = Path(tempfile.gettempdir()) / "scm-test-nonexistent-dir"
         try:
             config = merge_extra_layouts(self.base_config())
             assert config == self.base_config()
         finally:
-            EXTRA_LAYOUTS_PATH = original_dir
+            layouts.EXTRA_LAYOUTS_PATH = original_dir
 
     def test_dir_file_collision_raises(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -282,13 +283,13 @@ class TestMergeExtraLayouts:
                     "card_sizes": {"poker": {"width": "1in", "height": "1in"}},
                 },
             )
-            original_dir = EXTRA_LAYOUTS_PATH
-            EXTRA_LAYOUTS_PATH = Path(tmpdir)
+            original_dir = layouts.EXTRA_LAYOUTS_PATH
+            layouts.EXTRA_LAYOUTS_PATH = Path(tmpdir)
             try:
                 with pytest.raises(ValueError):
                     merge_extra_layouts(self.base_config())
             finally:
-                EXTRA_LAYOUTS_PATH = original_dir
+                layouts.EXTRA_LAYOUTS_PATH = original_dir
 
     def test_dir_files_merge_before_env_var_files(self):
         with (
@@ -309,13 +310,13 @@ class TestMergeExtraLayouts:
                     "card_sizes": {"sorcery": {"width": "2.61in", "height": "3.74in"}},
                 },
             )
-            original_dir = EXTRA_LAYOUTS_PATH
-            EXTRA_LAYOUTS_PATH = Path(dir_tmpdir)
+            original_dir = layouts.EXTRA_LAYOUTS_PATH
+            layouts.EXTRA_LAYOUTS_PATH = Path(dir_tmpdir)
             os.environ[EXTRA_LAYOUTS_ENV] = env_path
             try:
                 config = merge_extra_layouts(self.base_config())
                 assert "mtg" in config["card_sizes"]
                 assert "sorcery" in config["card_sizes"]
             finally:
-                EXTRA_LAYOUTS_PATH = original_dir
+                layouts.EXTRA_LAYOUTS_PATH = original_dir
                 del os.environ[EXTRA_LAYOUTS_ENV]
