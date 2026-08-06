@@ -43,17 +43,16 @@ def delete_hidden_files_in_directory(path: Path) -> None:
     extraneous_files = {".DS_Store", "Thumbs.db", "desktop.ini", "Icon\r"}
 
     for item in path.iterdir():
-        if item.is_file() and (item in extraneous_files or item.name.startswith("._")):
+        if item.is_file() and (item.name in extraneous_files or item.name.startswith("._")):
             try:
                 os.remove(item)
                 print(f"Removed hidden file: {item}")
             except OSError as e:
                 print(f"Could not remove {item}: {e}")
 
-
 # [!] Only used once. Can be removed.
 def get_directory(path: Path) -> Path:
-    return path if path.is_dir() else path.parent
+    return path.resolve() if path.is_dir() else path.parent.resolve()
 
 
 # [!] Used by plugins

@@ -191,7 +191,7 @@ class TestGetDirectory:
         """Directory path should return absolute directory path."""
         with tempfile.TemporaryDirectory() as tmpdir:
             result = get_directory(Path(tmpdir))
-            assert result == os.path.abspath(tmpdir)
+            assert result == Path(tmpdir).resolve()
 
     def test_file_path(self):
         """File path should return absolute parent directory."""
@@ -201,7 +201,7 @@ class TestGetDirectory:
                 _ = f.write("test")
 
             result = get_directory(Path(file_path))
-            assert result == os.path.abspath(tmpdir)
+            assert result == Path(tmpdir).resolve()
 
 
 class TestGetBackCardImagePath:
