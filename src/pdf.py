@@ -17,6 +17,7 @@ from src import measurements
 from src.draw import draw_card_layouts, draw_outlines
 from src.enums import FitMode, Orientation, OrientationMode, Registration, Variant
 from src.images import (
+    MINIMUM_BLEED,
     calculate_max_print_bleed,
     load_card_image,
     parse_crop_string,
@@ -452,7 +453,7 @@ def generate_pdf(
         pages: list[Image.Image] = []
 
         max_print_bleed = calculate_max_print_bleed(
-            x_pos, y_pos, card_width_px, card_height_px
+            x_pos, y_pos, card_width_px, card_height_px, MINIMUM_BLEED
         )
 
         # Cache back

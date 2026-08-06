@@ -19,11 +19,12 @@ def calculate_max_print_bleed(
     y_pos: list[int],
     width: int,
     height: int,
+    min_bleed: int = 0
 ) -> tuple[int, int]:
 
     def max_bleed(positions: list[int], size: int) -> int:
         if len(positions) < 2:
-            return MINIMUM_BLEED
+            return min_bleed
 
         positions = sorted(positions)
         return max(0, math.ceil((positions[1] - positions[0] - size) / 2))
@@ -123,7 +124,10 @@ def parse_crop_string(
         return 0, 0
 
     valid_units = ["", "mm", "in", "%"]
-    amount, unit = measurements.parse_unit_string(crop_string, valid_units)
+    try: 
+        amount, unit = measurements.parse_unit_string(crop_string, valid_units)
+    except ValueError as e:
+        raise ValueError(f"Invalid Crop Format: {crop_string}") from e
 
     if unit == "mm":
         return convert_inch_to_crop(amount / 25.4, card_width, card_height)
