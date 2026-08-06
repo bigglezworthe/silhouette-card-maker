@@ -27,8 +27,86 @@ conventions and identifying modernization methods. We had a riveting
 discussion on what to name the Paths class, whether it should even be a 
 class, and what the scope of its content should be. Super exciting stuff.
 
-FUTURE GOALS: 
-- Refactor of utilities.py content
-- Restructure project
-- Create a saved/editable user config
-- Package SCM to run directly from terminal
+ROADMAP: 
+src/draw.py
+  Functions
+    - draw_card_with_bleed
+    - draw_card_layout
+    - draw_card_layouts
+    - draw_outline
+    - draw_outlines
+
+src/enums.py
+  Classes
+    - Registration
+    - Orientation
+    - OrientationMode
+    - Variant
+    - Unit
+    - FitMode
+
+src/images.py
+  Constants
+    - MINIMUM_BLEED
+  Functions
+    - calculate_max_print_bleed
+    - fill_rounded_corners
+    - load_card_image
+    - convert_inch_to_crop
+    - parse_dimension_string
+    - parse_crop_string
+    - crop_and_scale_image
+
+src/layouts.py
+  Constants
+    - CUTTING_TEMPLATES_DIR_ENV
+    - EXTRA_LAYOUTS_ENV
+    - EXTRA_LAYOUTS_PATH
+    - LAYOUTS_FILENAME
+    - LAYOUTS_PATH
+  Classes
+    - RegistrationSettings
+    - VariantRegistrationSettings
+    - DefaultSettings
+    - CardSizeDef
+    - PaperSizeDef
+    - CardLayout
+    - SpecialtyCardSizeDef
+    - SpecialtyPaperSizeDef
+    - SpecialtyLayoutDef
+    - LayoutConfig
+  Functions
+    - extra_layout_paths
+    - find_extra_layout_owner
+    - merge_extra_layouts
+    - resolve_cutting_templates_dir
+    - resolve_card_size_alias
+    - resolve_paper_size_alias
+    - get_all_card_size_names
+    - get_all_paper_size_names
+    - get_all_specialty_layout_names
+    - load_layout_config
+    - biased_sort
+
+src/measurements.py
+  Constants
+    - MM_PER_INCH
+    - PT_PER_INCH
+  Functions
+    - parse_unit_string
+    - size_to_mm
+    - size_to_in
+    - size_to_pt
+    - size_to_pixel
+
+src/offset.py
+  Constants
+    - DATA_PATH
+    - OFFSET_DATA_PATH
+  Classes
+    - OffsetData
+  Functions
+    - save_offset
+    - load_saved_offset
+    - offset_images
+
