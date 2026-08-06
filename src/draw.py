@@ -72,7 +72,6 @@ def draw_card_with_bleed(
     fill_corner(0, height - 1, x - bleed_left, y + height, bleed_left, bleed_bottom)
     fill_corner(width - 1, height - 1, x + width, y + height, bleed_right, bleed_bottom)
 
-    # [!] Why not just paste a rectangle beneath the card? Seems easier than filling space 1px at a time
 
 
 def draw_card_layout(
@@ -104,7 +103,6 @@ def draw_card_layout(
     crop_backs_percent_x, crop_backs_percent_y = crop_backs
     print_bleed_x, print_bleed_y = print_bleed
 
-    # [!] These values are all positive, so int() = math.floor and int()+1 = math.ceil.
     extend_edges_thickness = math.floor(extend_edges * ppi_ratio)
     extend_edges_backs_thickness = math.floor(extend_edges_backs * ppi_ratio)
     extend_corners_thickness = math.floor(extend_corners_radius * ppi_ratio)
@@ -193,7 +191,6 @@ def draw_card_layout(
         edge_bleed_height = synthetic_bleed[1] + active_extend_edges_thickness
 
         # Handle edges
-        # [!] Changed notation to bool arithmetic instead of if/else
         extra_bleed_top = extend_bleed_thickness * (row == 0)
         extra_bleed_bottom = extend_bleed_thickness * (row == num_rows - 1)
         extra_bleed_left = extend_bleed_thickness * (col == 0)

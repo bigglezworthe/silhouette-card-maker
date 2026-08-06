@@ -70,7 +70,6 @@ class PaperSizeDef(BaseModel):
     @model_validator(mode="after")
     def validate_orientation(self) -> "PaperSizeDef":
         if size_to_mm(self.width) < size_to_mm(self.height):
-            # [!] Why not just swap them?
             raise ValueError(
                 f"Paper width ({self.width}) must be >= height ({self.height}). Paper sizes are stored as landscape."
             )
@@ -140,7 +139,6 @@ def find_extra_layout_owner(section: str, key: str) -> Path | None:
     return None
 
 
-# [!] Need to figure out a solution for these type warnings. Should be able to use SpecialtyLayoutDef
 def merge_extra_layouts(raw_config: dict[str, Any]) -> dict[str, Any]:
     for path in extra_layout_paths():
         with path.open("r") as f:
@@ -197,7 +195,6 @@ def resolve_paper_size_alias(layout_config: LayoutConfig, paper_size: str) -> st
 # ============================
 # Get All's
 # ============================
-# [!] Should probably just be class methods for LayoutConfig
 def get_all_card_size_names(layout_config: LayoutConfig) -> list[str]:
     names = list(layout_config.card_sizes.keys())
     for card_def in layout_config.card_sizes.values():
@@ -233,7 +230,6 @@ def load_layout_config() -> LayoutConfig:
 # ============================
 # Misc
 # ============================
-# [!] Don't have a good place to put this and it's only used in this file
 def biased_sort(items: list[str], priority: list[str]) -> list[str]:
     priority_items = [s for s in priority if s in items]
     rest = sorted(

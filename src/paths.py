@@ -11,7 +11,6 @@ from pathlib import Path
 RELATIVE_ROOT = Path(__file__).parent.parent
 
 
-# [!] How exhaustive should this be?
 class Paths:
     root: Path = RELATIVE_ROOT
     assets: Path = root / "assets"
@@ -34,7 +33,6 @@ def check_paths_subset(subset: set[str], mainset: set[str]) -> set[str]:
 # ============================
 
 
-# [!] Unnecessary function. These files tend to repopulate.
 def delete_hidden_files_in_directory(path: Path) -> None:
     if not path.is_dir():
         return
@@ -50,19 +48,16 @@ def delete_hidden_files_in_directory(path: Path) -> None:
             except OSError as e:
                 print(f"Could not remove {item}: {e}")
 
-# [!] Only used once. Can be removed.
 def get_directory(path: Path) -> Path:
     return path.resolve() if path.is_dir() else path.parent.resolve()
 
 
-# [!] Used by plugins
 def ensure_directory(path: str) -> str:
     """Create directory and any missing parent directories. Returns the path."""
     os.makedirs(path, exist_ok=True)
     return path
 
 
-# [!] Only used once. Can be removed.
 # Function renamed: added _exists
 def ensure_output_directory_exists(output_path: Path) -> None:
     parent = output_path.parent
@@ -73,7 +68,6 @@ def ensure_output_directory_exists(output_path: Path) -> None:
 # ============================
 # Image paths
 # ============================
-# [!] Might get moved to images.py
 
 # List can be found here: https://github.com/h2non/filetype.py?tab=readme-ov-file#image
 # Pillow suported formats: https://pillow.readthedocs.io/en/stable/handbook/image-file-formats.html
@@ -107,7 +101,6 @@ def get_image_file_paths(dir_path: str) -> list[str]:
         for filename in files:
             full_path = os.path.join(current_folder, filename)
 
-            # [!] Why are we using filetype.guess_mime() instead of checking extension?
             if filetype.guess_mime(full_path) in VALID_MIMETYPES:
                 relative_path = os.path.relpath(full_path, dir_path)
                 result.append(relative_path)
@@ -115,7 +108,6 @@ def get_image_file_paths(dir_path: str) -> list[str]:
     return result
 
 
-# [!] Probably should be renamed. Not very similar to get_image_file_paths.
 # Allows user to select when multiple card back options exist
 def get_back_card_image_path(back_dir_path: str | Path) -> Path | None:
     files = [

@@ -2,7 +2,6 @@
 import os
 import shutil
 
-# [!] src/paths.py has VALID_MIMETYPES but that requires a filetypes import
 VALID_IMAGE_EXTENSIONS = (
     # ".vnd.dwg",
     # ".x-xcf",

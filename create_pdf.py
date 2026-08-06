@@ -91,13 +91,11 @@ def cli(
     show_outline: bool,
     borderless: bool,
 ):
-    # [!] Refactor: use Path exclusively
     front_dir_path = str(front_dir_path)
     back_dir_path = str(back_dir_path)
     double_sided_dir_path = str(double_sided_dir_path)
     output_path = str(output_path)
 
-    # [!] Validation to satisfy type hints
     skip = skip or []
     label = label or ""
 

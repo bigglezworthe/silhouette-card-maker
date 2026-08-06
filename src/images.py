@@ -67,7 +67,6 @@ def fill_rounded_corners(card_image: Image.Image, corner_radius: int) -> Image.I
 
                     # Copy the arc pixel outward
                     try:
-                        # [!] There's a type warning here that's internal to Pillow.
                         pixel = result.getpixel((src_x, src_y))
                         result.putpixel((local_x, local_y), pixel)
                     except (IndexError, ValueError):
@@ -137,7 +136,6 @@ def parse_crop_string(
     return amount, amount
 
 
-# [!] X/Ys should be consolidated for args and return
 def crop_and_scale_image(
     card_image: Image.Image,
     crop_percent_x: float,
@@ -178,7 +176,6 @@ def crop_and_scale_image(
     can_bleed_x = unscaled_width_with_bleed <= card_width
     can_bleed_y = unscaled_height_with_bleed <= card_height
 
-    # [!] Definitely some duplication happening here. Can set vars and perform ops after.
     if can_bleed_x and can_bleed_y:
         crop_x = (card_width - unscaled_width_with_bleed) // 2
         crop_y = (card_height - unscaled_height_with_bleed) // 2

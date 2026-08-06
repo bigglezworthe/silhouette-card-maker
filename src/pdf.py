@@ -74,7 +74,6 @@ def add_front_back_pages(
 
     # Label goes on short side of paper opposite top-left black square
     if orientation == Orientation.LANDSCAPE:
-        # [!] This feels expensive for placing text.
         front_page = front_page.rotate(-90, expand=True)
         draw = ImageDraw.Draw(front_page)
         label_x = math.floor((page_height / 2) * ppi_ratio)
@@ -91,7 +90,6 @@ def add_front_back_pages(
             (label_x, label_y), label_text, fill=(0, 0, 0), anchor="mm", font=font
         )
 
-    # [!] Can be included in ELSE above
     if orientation == Orientation.PORTRAIT:
         front_page = front_page.rotate(90, expand=True)
         back_page = back_page.rotate(90, expand=True)
@@ -101,7 +99,6 @@ def add_front_back_pages(
         pages.append(back_page)
 
 
-# [!] Might belong in layout.py?
 def find_best_orientation(
     orientation_mode: OrientationMode,
     card_width: str,
@@ -460,12 +457,10 @@ def generate_pdf(
         single_back_image = None
         if not only_fronts and not use_default_back_page:
             if back_card_image_path is not None:
-                # [!] Created load_card_image() to remove duplicated code
                 single_back_image = load_card_image(back_card_image_path, "back")
 
         # Create card layout
         num_image = 1
-        # [!] Does it really matter that it's natsorted?
         it = iter(
             natsorted(list(check_paths_subset(front_set, ds_set)))
             + natsorted(list(ds_set))
@@ -520,7 +515,6 @@ def generate_pdf(
             front_page = reg_im.copy()
             back_page = reg_im.copy()
 
-            # [!] Consolidated calls
             draw_card_layouts(
                 front_card_images,
                 back_card_images,
@@ -549,7 +543,6 @@ def generate_pdf(
             )
 
             if show_outline:
-                # [!] Consolidated calls
                 draw_outlines(
                     [front_page, back_page],
                     x_pos,

@@ -28,7 +28,6 @@ def save_offset(x_offset: int, y_offset: int, angle_offset: float = 0.0) -> None
         _ = offset_file.write(offset_data.model_dump_json(indent=4))
     print("Offset data saved!")
 
-# [!] Method of OffsetData?
 def load_saved_offset() -> OffsetData | None:
     if not OFFSET_DATA_PATH.is_file():
         return None 
