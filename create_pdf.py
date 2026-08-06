@@ -1,6 +1,3 @@
-# [!] fmt: off suppresses the Ruff formatter to keep the click.options(...) on single lines
-# fmt: off
-
 import click
 
 from pathlib import Path

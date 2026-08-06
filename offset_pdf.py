@@ -2,8 +2,7 @@ import os
 import click
 import pypdfium2 as pdfium
 
-from utilities import offset_images
-from src.offset import save_offset, load_saved_offset
+from src.offset import save_offset, load_saved_offset, offset_images
 
 output_directory = os.path.join('game', 'output')
 default_output_pdf_path = os.path.join(output_directory, 'game.pdf')
