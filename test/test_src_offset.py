@@ -4,6 +4,8 @@ import os
 from src.offset import save_offset, load_saved_offset, offset_images, OffsetData
 
 from PIL import Image
+from pathlib import Path
+from unittest.mock import patch
 
 
 class TestOffsetImages:
@@ -76,17 +78,17 @@ class TestOffsetDataSaveLoad:
                 assert result.y_offset == 20
             finally:
                 os.chdir(original_cwd)
-
+    
+    # Test changed: Import path is now absolute derived from __file__
     def test_load_nonexistent_returns_none(self):
         """Loading non-existent offset file should return None."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            original_cwd = os.getcwd()
-            os.chdir(tmpdir)
-            try:
+            missing_path = Path(tmpdir) / "offset_data.json"
+
+            with patch("src.offset.OFFSET_DATA_PATH", missing_path):
                 result = load_saved_offset()
-                assert result is None
-            finally:
-                os.chdir(original_cwd)
+
+            assert result is None
 
     def test_save_and_load_with_angle(self):
         """Saved offset with angle should roundtrip correctly."""

@@ -7,10 +7,9 @@ import os
 import json 
 import math
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from .paths import Paths
 
-from xml.dom import ValidationErr
 from PIL import Image, ImageChops 
 
 DATA_PATH = Paths.root / "data"
@@ -40,7 +39,7 @@ def load_saved_offset() -> OffsetData | None:
             return OffsetData(**data)
         except json.JSONDecodeError as e:
             print(f"Cannot decode offset JSON: {e}")
-        except ValidationErr as e:
+        except ValidationError as e:
             print(f"Cannot validate offset data: {e}")
 
     return None
