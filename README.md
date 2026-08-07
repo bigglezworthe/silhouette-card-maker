@@ -118,7 +118,7 @@ The [Yu-Gi-Oh! plugin](plugins/yugioh/README.md) supports **YDK** and **YDKE** f
 
 The [Altered plugin](plugins/altered/README.md) supports **Ajordat** format.
 
-The [Arkham Horror LCG plugin](plugins/arkham_horror_lcg/README.md) supports **ArkhamDB** format.
+The [Arkham Horror: The Card Game plugin](plugins/arkham_horror_lcg/README.md) supports **ArkhamDB** format.
 
 The [Ashes Reborn plugin](plugins/ashes_reborn/README.md) supports **Ashes** and **Ashes DB** formats.
 
@@ -137,6 +137,8 @@ The [Flesh and Blood plugin](plugins/flesh_and_blood/README.md) supports **Fabra
 The [Grand Archive plugin](plugins/grand_archive/README.md) supports **Omnideck** format.
 
 The [Gundam plugin](plugins/gundam/README.md) supports **DeckPlanet**, **Egman Events**, **ExBurst**, and **Limitless TCG** formats.
+
+The [Lord of the Rings: Living Card Game plugin](plugins/lotr_lcg/README.md) supports **RingsDB decklists**, **RingsDB fellowships**, and **RingsDB scenarios**, using user-supplied local back scans.
 
 The [Lorcana plugin](plugins/lorcana/README.md) supports **Dreamborn** format.
 
