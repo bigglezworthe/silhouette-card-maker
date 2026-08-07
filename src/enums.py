@@ -2,7 +2,6 @@
 # enums.py 
 #     Enums live here. 
 #==============================================================================
-
 from enum import Enum
 
 class Registration(str, Enum):
