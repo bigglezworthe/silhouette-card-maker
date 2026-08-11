@@ -1,0 +1,16 @@
+{
+    "ppi": 300,
+    "card_radius": "3mm",
+    "registration": {
+        "default": {
+            "inset": "10mm",
+            "thickness": "1mm",
+            "length": "5mm"
+        },
+        "borderless": {
+            "inset": "3.5mm",
+            "thickness": "1mm",
+            "length": "5mm"
+        }
+    }
+}

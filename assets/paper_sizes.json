@@ -1,0 +1,28 @@
+{
+    "letter": {
+        "width": "11in",
+        "height": "8.5in",
+        "aliases": [
+            "ansi_a"
+        ]
+    },
+    "tabloid": {
+        "width": "17in",
+        "height": "11in",
+        "aliases": [
+            "ansi_b"
+        ]
+    },
+    "a4": {
+        "width": "297mm",
+        "height": "210mm"
+    },
+    "a3": {
+        "width": "420mm",
+        "height": "297mm"
+    },
+    "arch_b": {
+        "width": "18in",
+        "height": "12in"
+    }
+}

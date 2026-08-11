@@ -38,9 +38,11 @@ import platform
 import click
 
 from src.enums import Orientation, Variant, Unit
+from src.layout_models import LayoutDefs
 from src.layouts import (
     load_layout_config,
     get_all_paper_size_names,
+    load_layouts,
     resolve_paper_size_alias,
     LayoutConfig,
     resolve_cutting_templates_dir,
@@ -48,6 +50,7 @@ from src.layouts import (
 from src import measurements
 from src import page_manager
 from src.page_manager import BORDERLESS_EXPANSION_MM
+from src.paths import Paths
 
 # Platform check - this script only works on Windows
 if platform.system() != "Windows":
@@ -55,7 +58,7 @@ if platform.system() != "Windows":
         f"Error: dxf_to_studio3.py only works on Windows (current platform: {platform.system()})",
         file=sys.stderr,
     )
-    print("", file=sys.stderr)
+    print(file=sys.stderr)
     print(
         "This script uses GUI automation to control Silhouette Studio, which requires Windows.",
         file=sys.stderr,
@@ -103,7 +106,7 @@ ACTION_DELAY = 1.0  # Delay between UI actions (clicking, typing, panel switches
 LONG_DELAY = 5.0  # Long operations (file load, save, startup uses 2x)
 
 # Calibration file location
-ASSETS_DIR = Path(__file__).parent / "assets"
+ASSETS_DIR = Paths.assets
 CALIBRATION_FILE = ASSETS_DIR / "gui_coordinates.json"
 
 # Batch conversion defaults
@@ -214,7 +217,7 @@ def paste():
     time.sleep(SETTLE_DELAY)
 
 
-def load_calibration(filepath: Path = None) -> Optional[dict]:
+def load_calibration(filepath: Path | None = None) -> dict | None:
     """Load calibration data from JSON file.
 
     If no filepath given, uses the default CALIBRATION_FILE.
@@ -923,9 +926,7 @@ CALIBRATION_ELEMENTS = [
 # =============================================================================
 
 
-def parse_dxf_filename(
-    filename: str, config: LayoutConfig
-) -> tuple[str, str, Variant] | None:
+def parse_dxf_filename(filename: str, layout_defs: LayoutDefs) -> tuple[str, str, Variant] | None:
     """Extract paper_size, card_size, and variant from a DXF filename.
 
     Expected formats:
@@ -937,7 +938,7 @@ def parse_dxf_filename(
     """
     stem = Path(filename).stem
 
-    for paper_size in config.paper_sizes:
+    for paper_size in layout_defs.paper_sizes.names():
         if stem.startswith(paper_size + "-"):
             remainder = stem[len(paper_size) + 1 :]
             # Strip version suffix (-v1, -v2, etc.)
@@ -952,43 +953,38 @@ def parse_dxf_filename(
                 variant = Variant.DEFAULT
 
             # Verify the layout exists
-            if (
-                paper_size in config.layouts
-                and card_size in config.layouts[paper_size]
-                and variant.value in config.layouts[paper_size][card_size]
-            ):
+            try:
+                layout_defs.paper_layouts[paper_size][card_size][variant]
+            except KeyError:
                 return paper_size, card_size, variant
 
     return None
 
 
-def get_paper_dimensions(
-    paper_size: str | None, config: LayoutConfig
-) -> tuple[str, str]:
+def get_paper_dimensions( paper_size: str | None, layout_defs: LayoutDefs) -> tuple[str, str]:
     """Get paper width and height unit strings for a paper size.
 
     Falls back to letter size if paper_size is None or unknown.
     """
-    if paper_size is not None and paper_size in config.paper_sizes:
-        paper_def = config.paper_sizes[paper_size]
+    if paper_size is not None and paper_size in layout_defs.paper_sizes.names():
+        paper_def = layout_defs.paper_sizes[paper_size]
         return paper_def.width, paper_def.height
 
-    paper_def = config.paper_sizes["letter"]
+    paper_def = layout_defs.paper_sizes["letter"]
     return paper_def.width, paper_def.height
-
 
 def get_orientation_for_dxf(
     paper_size: str | None,
     card_size: str | None,
     variant: Variant | None,
-    config: LayoutConfig,
+    layout_defs: LayoutDefs,
 ) -> Orientation:
     """Look up the paper orientation for a paper/card/variant combination from layouts.json.
 
     Falls back to landscape if any parameter is None.
     """
     if paper_size is not None and card_size is not None and variant is not None:
-        return config.layouts[paper_size][card_size][variant.value].orientation
+        return layout_defs.paper_layouts[paper_size][card_size][variant].orientation
 
     return Orientation.LANDSCAPE
 
@@ -997,7 +993,7 @@ def get_max_length_for_dxf(
     paper_size: str | None,
     card_size: str | None,
     variant: Variant | None,
-    config: LayoutConfig,
+    layout_defs: LayoutDefs,
     unit: Unit,
 ) -> float | None:
     """Look up the max registration mark length for a paper/card/variant combination.
@@ -1013,7 +1009,7 @@ def get_max_length_for_dxf(
         Max length in the requested unit, or None if not available.
     """
     if paper_size is not None and card_size is not None and variant is not None:
-        layout_reg = config.layouts[paper_size][card_size][variant.value].registration
+        layout_reg = layout_defs.paper_layouts[paper_size][card_size][variant.value].registration
         mm = (
             measurements.size_to_mm(layout_reg.length)
             if layout_reg is not None and layout_reg.length is not None
@@ -1132,14 +1128,14 @@ def single(
         )
 
     # Look up page dimensions from layouts.json
-    config = load_layout_config()
-    paper_size = resolve_paper_size_alias(config, paper_size)
-    if paper_size not in config.paper_sizes:
+    layout_defs = load_layouts()
+    paper_size = resolve_paper_size_alias(layout_defs.paper_sizes, paper_size)
+    if paper_size not in layout_defs.paper_sizes.names():
         click.echo(
-            f"Error: Unknown paper size '{paper_size}'. Available: {list(config.paper_sizes.keys())}"
+            f"Error: Unknown paper size '{paper_size}'. Available: {layout_defs.paper_sizes.names())}"
         )
         return
-    paper_def = config.paper_sizes[paper_size]
+    paper_def = layout_defs.paper_sizes[paper_size]
     paper_width = paper_def.width
     paper_height = paper_def.height
 

@@ -1,122 +1,239 @@
 # ==============================================================================
 # measurements.py
 #     Value + Unit string parsing and unit conversion.
+# 
+# [!] NOTES: 
+# This got a bit out of hand. It started as a simple unit conversion tool that
+# carried magnitude but also retained unit. No more length_mm and length_px 
+# being passed around. No more convert_to(<unit>) blocks at the top of 
+# functions. Just nice, simple Measurements that could be passed around and 
+# converted on the fly as needed. 
+#
+# Then came the initialization of JSON-loaded units and CLI args as Measurements,
+# which vastly simplified a lot of existing code. Fantastic! But the shortcomings 
+# of a sequential refactor came shortly after when reality struck that these 
+# units aren't just sitting around looking pretty, they're here for math. 
+#
+# Measurements are completely unwieldy when it comes to basic arithmetic since 
+# you can't add 2 classes. The answer seemed simple: z = x.value + y.value, done! 
+# But z isn't a Measurement, so now that needs to be wrapped. Args were getting
+# unpacked when entering a function, then repacked back into their Measurement-
+# based structs on exiting. The return of length_px was back in full force.
+#
+# A fork in the road arrived where Measurements needed to be abandoned entirely 
+# or Measurements need to natively support basic arithmetic. The current form 
+# has decided to overload arithmetic operators. Hopefully it works out... (if
+# you're reading this, it did!)
 # ==============================================================================
-
+# [!] CURRENTLY ASSUMES 300ppi FOR ALL ARITHMETIC OPS CONVERTING TO PIXEL
+from __future__ import annotations
+from collections.abc import Collection
 import re
 from enum import Enum
-from typing import Self
+from typing import Self, override
 from dataclasses import dataclass
 
-_UNIT_PATTERN = re.compile(r"^(?P<amount>\d+(?:\.\d*)?|\.\d+)(?P<unit>[a-zA-Z%]+)?$")
 
-# Available units for conversion 
-class ConvertUnits(str, Enum):
-    NONE = ""
-    MM = "mm"
-    IN = "in"
-    PX = "px"
-    PT = "pt"
+_MEASUREMENT_PATTERN = re.compile(r"^(?P<quant>\d+(?:\.\d*)?|\.\d+)(?P<unit>[a-zA-Z%]+)?$")
 
-# Physical units for input 
-class InputUnits(str, Enum):
-    NONE = ConvertUnits.NONE.value
-    MM = ConvertUnits.MM.value
-    IN = ConvertUnits.IN.value
-    PT = ConvertUnits.PT.value
-
-DEFAULT_UNIT = ConvertUnits.MM
+DEFAULT_PPI = 300
 MM_PER_INCH = 25.4
 PT_PER_INCH = 72
 
-@dataclass(frozen=True, order=True)
+# Physical units for input 
+class MeasureUnits(str, Enum):
+    MM = "mm"
+    IN = "in"
+    PT = "pt"
+    PX = "px"
+    PERCENT = "%"
+
+DEFAULT_UNIT = MeasureUnits.MM 
+
+@dataclass(frozen=True)
 class Measurement:
-    mm: float
+    value: float = 0
+    unit: MeasureUnits = DEFAULT_UNIT
+
+    @staticmethod
+    def _coerce_unit(unit: MeasureUnits | str, invalid_units: Collection[MeasureUnits] = ()) -> MeasureUnits:
+        try: 
+            if unit in invalid_units:
+                raise ValueError
+            return MeasureUnits(unit)
+        except ValueError:
+            units = ", ".join(u.value for u in MeasureUnits if u not in invalid_units)
+            raise ValueError(f"Invalid unit: {unit}. Supported units: {units}") from None 
+
 
     @classmethod
-    def parse(cls, measurement_str: str | None) -> Self:
-        if measurement_str is None:
-            return cls(0)
+    def parse(
+        cls, 
+        measurement_str: str,
+        *,
+        default_unit: MeasureUnits | str = DEFAULT_UNIT,
+        invalid_units: Collection[MeasureUnits | str] = (),
+    ) -> Self:
 
-        match = _UNIT_PATTERN.fullmatch(measurement_str.strip().lower())
+        invalid_units = {cls._coerce_unit(unit) for unit in invalid_units}
+        default_unit = cls._coerce_unit(default_unit, invalid_units)
+
+        match = _MEASUREMENT_PATTERN.fullmatch(measurement_str.strip().lower())
 
         if not match:
             raise ValueError(f"Invalid measurement format: {measurement_str}")
 
-        amount = float(match["amount"])
-        unit_string = match["unit"]
+        amount = float(match["quant"])
+        unit_string = match["unit"] or default_unit.value
+        unit = cls._coerce_unit(unit_string, invalid_units)
 
-        if unit_string == "":
-            unit = InputUnits.MM
-        else:
-            try:
-                unit = InputUnits(unit_string)
-            except ValueError:
-                raise ValueError(f"Invalid unit: {unit_string}") from None
-
-        return cls.from_value(amount, unit)
+        return cls(amount, unit)
 
     @classmethod
-    def from_value(cls, value: float, unit: InputUnits) -> Self:
+    def from_value(cls, value: float, unit: MeasureUnits | str) -> Self: 
+        unit = cls._coerce_unit(unit)
+        return cls(value, unit)
+
+    def to(self, unit: MeasureUnits | str, ppi: int = DEFAULT_PPI) -> Self:
+        unit = self._coerce_unit(unit)
+
+        if self.unit == unit:
+            return self
+
+        value = self.value
+
+        # convert to mm, then to whatever else 
+        match self.unit:
+            case MeasureUnits.MM:
+                value = value * 1
+            case MeasureUnits.IN:
+                value = value * MM_PER_INCH
+            case MeasureUnits.PT:
+                value = value * MM_PER_INCH / PT_PER_INCH
+            case MeasureUnits.PX:
+                value = value * MM_PER_INCH / ppi
+            case MeasureUnits.PERCENT:
+                raise ValueError("Percentage measurements cannot be converted.")
+
         match unit:
-            case InputUnits.MM:
-                return cls(value)
-            case InputUnits.IN:
-                return cls(value * MM_PER_INCH)
-            case InputUnits.PT:
-                return cls(value / PT_PER_INCH * MM_PER_INCH)
-            case _:
-                raise ValueError(f"Unsupported unit: {unit}")
+            case MeasureUnits.MM:
+                value = value / 1
+            case MeasureUnits.IN: 
+                value = value / MM_PER_INCH
+            case MeasureUnits.PT:
+                value = value / MM_PER_INCH * PT_PER_INCH
+            case MeasureUnits.PX:
+                value = value / MM_PER_INCH * ppi
+            case MeasureUnits.PERCENT: 
+                raise ValueError("Measurements cannot be converted to percentage.")
 
-    @property
-    def inches(self) -> float:
-        return self.mm / MM_PER_INCH
+        return self.from_value(value, unit)
 
-    @property
-    def points(self) -> float:
-        return self.inches * PT_PER_INCH
+    def px(self, ppi: int = DEFAULT_PPI) -> Self:
+        return round(self.to(MeasureUnits.PX, ppi))
 
-    def pixels(self, ppi: int = 300) -> int:
-        return round(self.inches * ppi)
+    @override
+    def __str__(self) -> str:
+        return f"{self.value:g}{self.unit.value}"
 
-def parse_unit_string(
-    unit_string: str | None, valid_units: list[str]
-) -> tuple[float, str]:
-    if unit_string is None:
-        return 0, ""
+    #==========================================================
+    # MATH
+    #==========================================================
+    
+    #============================
+    # Arithmetic
+    #============================
+    
+    def _coerce_other(self, other: object) -> Measurement | None:
+        if not isinstance(other, Measurement):
+            return None
+        return other.to(self.unit)
 
-    match = _UNIT_PATTERN.fullmatch(unit_string.strip().lower())
+    def __add__(self, other: object) -> Self:
+        other = self._coerce_other(other)
+        if other is None:
+            return NotImplemented
+        return self.from_value(self.value + other.value, self.unit)
 
-    if not match:
-        raise ValueError(f"Invalid unit format: {unit_string}")
+    def __sub__(self, other: object) -> Self:
+        other = self._coerce_other(other)
+        if other is None:
+            return NotImplemented
+        return self.from_value(self.value - other.value, self.unit)
 
-    amount = match["amount"]
-    unit = match["unit"] or ""
+    def __mul__(self, other: object) -> Self:
+        if not isinstance(other, (int, float)):
+            return NotImplemented
+        return self.from_value(self.value * other, self.unit)
 
-    if valid_units and (unit not in valid_units):
-        raise ValueError(f"Invalid unit: {unit_string}. Valid units are {valid_units}")
+    def __rmul__(self, other: object) -> Self:
+        return self.__mul__(other)
 
-    return float(amount), unit
+    def __truediv__(self, other: object) -> Self | float:
+        if isinstance(other, Measurement):
+            return self.value / other.to(self.unit).value
+        if isinstance(other, (int, float)):
+            return self.from_value(self.value / other, self.unit)
+        return NotImplemented
+
+    #============================
+    # Comparisons
+    #============================
+
+    def __lt__(self, other: object) -> bool:
+        other = self._coerce_other(other)
+        if other is None:
+            return NotImplemented
+        return self.value < other.value
+
+    def __le__(self, other: object) -> bool:
+        other = self._coerce_other(other)
+        if other is None:
+            return NotImplemented
+        return self.value <= other.value
+
+    def __gt__(self, other: object) -> bool:
+        other = self._coerce_other(other)
+        if other is None:
+            return NotImplemented
+        return self.value > other.value
+
+    def __ge__(self, other: object) -> bool:
+        other = self._coerce_other(other)
+        if other is None:
+            return NotImplemented
+        return self.value >= other.value
+
+    @override
+    def __eq__(self, other: object) -> bool:
+        try:
+            other = self._coerce_other(other)
+        except ValueError:
+            return False
+
+        if other is None:
+            return False
+        return self.value == other.value
+
+    #============================
+    # Rounding
+    #============================
+
+    def __round__(self, ndigits: int | None = None) -> Self:
+        return self.from_value(round(self.value, ndigits), self.unit)
+
+    
+# [!] Not sure if this is useful. Might delete later.
+def percent_of(part: str | Measurement, total: str | Measurement) -> Measurement:
+    part = part if isinstance(part, Measurement) else Measurement.parse(part)
+    total = total if isinstance(total, Measurement) else Measurement.parse(total)
+
+    part_mm = part.to(MeasureUnits.MM).value
+    total_mm = total.to(MeasureUnits.MM).value
+
+    return Measurement.from_value(part_mm / total_mm * 100, MeasureUnits.PERCENT)
 
 
-def size_to_mm(size_string: str | None) -> float:
-    valid_units = ["", "in", "mm"]
-    amount, unit = parse_unit_string(size_string, valid_units)
-
-    if unit == "in":
-        return amount * MM_PER_INCH
-
-    # mm or no unit
-    return amount
 
 
-def size_to_in(size_string: str | None) -> float:
-    return size_to_mm(size_string) / MM_PER_INCH
 
-
-def size_to_pt(size_string: str | None) -> float:
-    return size_to_in(size_string) * PT_PER_INCH
-
-
-def size_to_pixel(size_string: str | None, ppi: int) -> int:
-    return round(size_to_in(size_string) * ppi)

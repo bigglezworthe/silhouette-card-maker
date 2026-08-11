@@ -77,7 +77,7 @@ def fill_rounded_corners(card_image: Image.Image, corner_radius: int) -> Image.I
 
 def load_card_image(image_path: str | Path, path_label: str = "") -> Image.Image | None:
 
-    path_label = f"{path_label.strip()} " if path_label else ""
+    path_label = f"{path_label.strip()} " if len(path_label) else ""
 
     try:
         image = Image.open(image_path)
@@ -115,6 +115,8 @@ def parse_dimension_string(dimension_string: str | None, ppi: int) -> int:
     if unit == "in":
         return math.floor(amount * ppi)
     return int(amount)
+
+
 
 
 def parse_crop_string(

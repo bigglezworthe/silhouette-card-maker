@@ -15,7 +15,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 from src import measurements
-from src.layouts import load_layout_config
+from src.layouts import load_defaults, load_paper_sizes
 
 # Specify directory locations
 # Use Path(__file__).parent to ensure paths work regardless of where script is run from
@@ -25,11 +25,14 @@ asset_directory = SCRIPT_DIR / 'assets'
 # Static distance from page margin used for all page labels and axis text
 MARGIN = 150
 
-layout_config = load_layout_config()
+defaults = load_defaults()
+ppi = defaults.ppi
 
-for paper_size, paper_def in layout_config.paper_sizes.items():
-    print_width = measurements.size_to_pixel(paper_def.width, layout_config.ppi)
-    print_height = measurements.size_to_pixel(paper_def.height, layout_config.ppi)
+paper_sizes = load_paper_sizes()
+
+for paper_size, paper_def in paper_sizes.papers().items():
+    print_width = measurements.size_to_pixel(paper_def.width, ppi)
+    print_height = measurements.size_to_pixel(paper_def.height, ppi)
 
     # Generate a blank white base image
     im = Image.new('RGB', (print_width, print_height), 'white')
@@ -61,7 +64,7 @@ for paper_size, paper_def in layout_config.paper_sizes.items():
             start_x = math.floor(print_width / 2) - (matrix_half_size_x * test_distance) - ((matrix_half_size_x + .5) * test_size)
         else:
             if matrix_size_x <= 0:
-                raise Exception(f'matrix_size must be greater than 0; received: {matrix_size_x}')
+                raise ValueError(f'matrix_size must be greater than 0; received: {matrix_size_x}')
             start_x = math.floor(print_width / 2) - ((matrix_half_size_x - .5) * test_distance) - (matrix_half_size_x * test_size)
 
         start_y = 0
@@ -69,7 +72,7 @@ for paper_size, paper_def in layout_config.paper_sizes.items():
             start_y = math.floor(print_height / 2) - (matrix_half_size_y * test_distance) - ((matrix_half_size_y + .5) * test_size)
         else:
             if matrix_size_y <= 0:
-                raise Exception(f'matrix_size must be greater than 0; received: {matrix_size_y}')
+                raise ValueError(f'matrix_size must be greater than 0; received: {matrix_size_y}')
             start_y = math.floor(print_height / 2) - ((matrix_half_size_y - .5) * test_distance) - (matrix_half_size_y * test_size)
 
 

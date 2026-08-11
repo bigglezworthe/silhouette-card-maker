@@ -2,15 +2,32 @@
 # draw.py
 #     Drawing onto the page.
 # ==============================================================================
+from dataclasses import dataclass
 import math
 
 from PIL import Image, ImageDraw
 from enum import Enum
 
-from src.enums import FitMode, Orientation
+from src.measurements import Measurement
+from src.enums import FitMode, Orientation, CardSide
 from src.images import fill_rounded_corners, crop_and_scale_image
 
 
+@dataclass(frozen=True)
+class SideRenderOptions:
+    crop: Measurement | None
+    fit: FitMode
+    extend_edges: Measurement | None 
+    extend_corners_radius: Measurement | None
+    extend_bleed: Measurement | None
+
+# [!] Might be able to freeze this? Looks like orientation is the holdup. 
+@dataclass(frozen=False) 
+class CardRenderOptions:
+    front: SideRenderOptions
+    back: SideRenderOptions
+    orientation: Orientation
+    
 def draw_card_with_bleed(
     card_image: Image.Image,
     base_image: Image.Image,
@@ -74,7 +91,6 @@ def draw_card_with_bleed(
 
     # [!] Why not just paste a rectangle beneath the card? Seems easier than filling space 1px at a time
 
-
 def draw_card_layout(
     card_images: list[Image.Image | None],
     single_back_image: Image.Image | None,
@@ -86,30 +102,23 @@ def draw_card_layout(
     width: int,
     height: int,
     print_bleed: tuple[int, int],
-    crop: tuple[float, float],
-    crop_backs: tuple[float, float],
+    render_opts: CardRenderOptions,
     ppi_ratio: float,
-    extend_edges: int,
-    extend_edges_backs: int,
-    extend_corners_radius: int,
-    extend_corners_backs_radius: int,
-    extend_bleed: int,
-    flip: bool,
-    fit: FitMode,
-    fit_backs: FitMode,
+    side: CardSide,
     orientation: Orientation,
 ) -> None:
     num_cards = num_rows * num_cols
-    crop_percent_x, crop_percent_y = crop
-    crop_backs_percent_x, crop_backs_percent_y = crop_backs
+    front_opts = render_opts.front
+    back_opts = render_opts.back 
+    crop_percent_x, crop_percent_y = front_opts.crop
+    crop_backs_percent_x, crop_backs_percent_y = back_opts.crop
     print_bleed_x, print_bleed_y = print_bleed
 
-    # [!] These values are all positive, so int() = math.floor and int()+1 = math.ceil.
-    extend_edges_thickness = math.floor(extend_edges * ppi_ratio)
-    extend_edges_backs_thickness = math.floor(extend_edges_backs * ppi_ratio)
-    extend_corners_thickness = math.floor(extend_corners_radius * ppi_ratio)
-    extend_corners_backs_thickness = math.floor(extend_corners_backs_radius * ppi_ratio)
-    extend_bleed_thickness = math.floor(extend_bleed * ppi_ratio)
+    extend_edges_thickness = math.floor(front_opts.extend_edges * ppi_ratio)
+    extend_edges_backs_thickness = math.floor(back_opts.extend_edges * ppi_ratio)
+    extend_corners_thickness = math.floor(front_opts.extend_corners_radius * ppi_ratio)
+    extend_corners_backs_thickness = math.floor(back_opts.extend_corners_radius * ppi_ratio)
+    extend_bleed_thickness = math.floor(front_opts.extend_bleed * ppi_ratio)
 
     scaled_width = math.floor(width * ppi_ratio)
     scaled_height = math.floor(height * ppi_ratio)
@@ -125,7 +134,7 @@ def draw_card_layout(
         col = i % num_cards % num_cols
         row = (i % num_cards) // num_cols
 
-        if flip:
+        if side == CardSide.BACK:
             if orientation == Orientation.PORTRAIT:
                 col = num_cols - col - 1
             else:
@@ -139,14 +148,15 @@ def draw_card_layout(
         bleed_offset_y = 0
         synthetic_bleed = (scaled_bleed_width, scaled_bleed_height)
 
+        
         if card_image is single_back_image:
             active_crop_x, active_crop_y = crop_backs_percent_x, crop_backs_percent_y
-            active_fit = fit_backs
+            active_fit = back_opts.fit
             active_extend_edges_thickness = extend_edges_backs_thickness
             active_extend_corners_thickness = extend_corners_backs_thickness
         else:
             active_crop_x, active_crop_y = crop_percent_x, crop_percent_y
-            active_fit = fit
+            active_fit = front_opts.fit
             active_extend_edges_thickness = extend_edges_thickness
             active_extend_corners_thickness = extend_corners_thickness
 
@@ -181,7 +191,7 @@ def draw_card_layout(
                 card_image, active_extend_corners_thickness
             )
 
-        if flip and orientation == Orientation.LANDSCAPE:
+        if side == CardSide.BACK and orientation == Orientation.LANDSCAPE:
             card_image = card_image.rotate(180)
 
         # Calculate final position
@@ -223,17 +233,8 @@ def draw_card_layouts(
     width: int,
     height: int,
     print_bleed: tuple[int, int],
-    crop: tuple[float, float],
-    crop_backs: tuple[float, float],
+    render_opts: CardRenderOptions,
     ppi_ratio: float,
-    extend_edges: int,
-    extend_edges_backs: int,
-    extend_corners_radius: int,
-    extend_corners_backs_radius: int,
-    extend_bleed: int,
-    extend_bleed_backs: int,
-    fit: FitMode,
-    fit_backs: FitMode,
     orientation: Orientation,
 ) -> None:
     draw_card_layout(
@@ -247,17 +248,9 @@ def draw_card_layouts(
         width,
         height,
         print_bleed,
-        crop,
-        crop_backs,
+        render_opts,
         ppi_ratio,
-        extend_edges,
-        extend_edges_backs,
-        extend_corners_radius,
-        extend_corners_backs_radius,
-        extend_bleed,
-        flip=False,
-        fit=fit,
-        fit_backs=fit_backs,
+        side=CardSide.FRONT,
         orientation=orientation,
     )
 
@@ -272,17 +265,9 @@ def draw_card_layouts(
         width,
         height,
         print_bleed,
-        crop,
-        crop_backs,
+        render_opts,
         ppi_ratio,
-        extend_edges,
-        extend_edges_backs,
-        extend_corners_radius,
-        extend_corners_backs_radius,
-        extend_bleed_backs,
-        flip=True,
-        fit=fit,
-        fit_backs=fit_backs,
+        side=CardSide.BACK,
         orientation=orientation,
     )
 

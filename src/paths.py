@@ -2,13 +2,24 @@
 # paths.py
 #     Contains relevant relative paths and file system ops
 # ==============================================================================
+from dataclasses import dataclass, field
 import os
 import filetype
 
 from pathlib import Path
 
-# Root directory from THIS file
+# Static root directory from THIS file
 RELATIVE_ROOT = Path(__file__).parent.parent
+
+@dataclass
+class ImagePaths:
+    front: Path
+    back: Path
+    double: Path
+    output: Path
+    front_image_paths: list[Path] = field(default_factory=list)
+    double_image_paths: list[Path] = field(default_factory=list)
+    back_image_path: Path | None = None
 
 
 # [!] How exhaustive should this be?
@@ -19,12 +30,13 @@ class Paths:
     fronts: Path = game / "front"
     backs: Path = game / "back"
     doubles: Path = game / "double_sided"
+    # [!] Should this be the output file or just the directory?
     output: Path = game / "output"
 
 
-def check_paths_subset(subset: set[str], mainset: set[str]) -> set[str]:
-    subset_stems = {Path(p).stem: p for p in subset}
-    mainset_stems = {Path(p).stem for p in mainset}
+def check_paths_subset(subset: set[Path], mainset: set[Path]) -> set[Path]:
+    subset_stems = {p.stem: p for p in subset}
+    mainset_stems = {p.stem for p in mainset}
 
     return {orig for stem, orig in subset_stems.items() if stem not in mainset_stems}
 
@@ -33,30 +45,13 @@ def check_paths_subset(subset: set[str], mainset: set[str]) -> set[str]:
 # Functions below this point been Pathified.
 # ============================
 
-
-# [!] Unnecessary function. These files tend to repopulate.
-def delete_hidden_files_in_directory(path: Path) -> None:
-    if not path.is_dir():
-        return
-
-    # Was global
-    extraneous_files = {".DS_Store", "Thumbs.db", "desktop.ini", "Icon\r"}
-
-    for item in path.iterdir():
-        if item.is_file() and (item.name in extraneous_files or item.name.startswith("._")):
-            try:
-                os.remove(item)
-                print(f"Removed hidden file: {item}")
-            except OSError as e:
-                print(f"Could not remove {item}: {e}")
-
 # [!] Only used once. Can be removed.
 def get_directory(path: Path) -> Path:
     return path.resolve() if path.is_dir() else path.parent.resolve()
 
 
-# [!] Used by plugins
-def ensure_directory(path: str) -> str:
+# [!] Used by plugins (keeping str | Path for now)
+def ensure_directory(path: str | Path) -> str | Path:
     """Create directory and any missing parent directories. Returns the path."""
     os.makedirs(path, exist_ok=True)
     return path
@@ -100,8 +95,8 @@ VALID_MIMETYPES = (
 )
 
 
-def get_image_file_paths(dir_path: str) -> list[str]:
-    result: list[str] = []
+def get_image_file_paths(dir_path: Path) -> list[Path]:
+    result: list[Path] = []
 
     for current_folder, _, files in os.walk(dir_path):
         for filename in files:
@@ -110,14 +105,14 @@ def get_image_file_paths(dir_path: str) -> list[str]:
             # [!] Why are we using filetype.guess_mime() instead of checking extension?
             if filetype.guess_mime(full_path) in VALID_MIMETYPES:
                 relative_path = os.path.relpath(full_path, dir_path)
-                result.append(relative_path)
+                result.append(Path(relative_path))
 
     return result
 
 
 # [!] Probably should be renamed. Not very similar to get_image_file_paths.
 # Allows user to select when multiple card back options exist
-def get_back_card_image_path(back_dir_path: str | Path) -> Path | None:
+def select_back_card_image_path(back_dir_path: Path) -> Path | None:
     files = [
         f
         for f in Path(back_dir_path).glob("*")

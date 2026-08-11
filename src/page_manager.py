@@ -15,9 +15,8 @@ from typing import NamedTuple
 from PIL import Image, ImageDraw
 from enum import Enum
 
-from src import measurements
+from src.measurements import Measurement
 from src.enums import Orientation, Registration
-from src.layouts import load_layout_config
 
 # [!] Enum? Dataclass?
 # Registration mark constraints (in mm)
@@ -29,31 +28,25 @@ MIN_REG_THICKNESS_MM = 0.5
 MIN_REG_INSET_MM = 10.0
 REG_PADDING_MM = 1.5  # Extra clearance around registration marks
 
-# [!] Is there a reason this is in layouts.json and not just a constant?
-# Inset
-_layout_config = load_layout_config()
-BORDERLESS_INSET_MM = measurements.size_to_mm(
-    _layout_config.defaults.registration.borderless.inset
-)
+# [!] Previously loaded from defaults.json
+BORDERLESS_INSET_MM = 10
 BORDERLESS_EXPANSION_MM = (MIN_REG_INSET_MM - BORDERLESS_INSET_MM) * 2
 
-
-class CardLayout(NamedTuple):
+# [!] Might need renaming to avoid confusion with Layout_Models
+class PageLayout(NamedTuple):
     card_width_px: int
     card_height_px: int
     paper_width_px: int
     paper_height_px: int
     x_pos: list[int]
     y_pos: list[int]
-    max_length_mm: float
-
+    max_length_mm: float 
 
 class CornerMatrix(Enum):
     TOP_LEFT = (-1, 1)
     TOP_RIGHT = (1, 1)
     BOTTOM_LEFT = (-1, -1)
     BOTTOM_RIGHT = (1, -1)
-
 
 def draw_reg_corner_lines(
     draw: ImageDraw.ImageDraw,
@@ -77,11 +70,11 @@ def draw_reg_corner_lines(
     draw.polygon(points, fill="black")
 
 def generate_reg_mark(
-    paper_width: str,
-    paper_height: str,
-    inset: str,
-    thickness: str,
-    length: str,
+    paper_width: Measurement,
+    paper_height: Measurement,
+    inset: Measurement,
+    thickness: Measurement,
+    length: Measurement,
     dpi: int,
     registration: Registration,
 ) -> Image.Image:
@@ -90,17 +83,17 @@ def generate_reg_mark(
     # [!] Pillow measures in px, MPL in mm.
     print("Generating Registration Marks")
 
-    paper_width_px = measurements.size_to_pixel(paper_width, dpi)
-    paper_height_px = measurements.size_to_pixel(paper_height, dpi)
-    inset_px = measurements.size_to_pixel(inset, dpi)
-    thickness_px = measurements.size_to_pixel(thickness, dpi)
-    length_px = measurements.size_to_pixel(length, dpi)
+    paper_width_px = paper_width.px(dpi)
+    paper_height_px = paper_height.px(dpi)
+    inset_px = inset.px(dpi)
+    thickness_px = thickness.px(dpi)
+    length_px = length.px(dpi)
 
-    min_reg_length_px = measurements.size_to_pixel(f"{MIN_REG_LENGTH_MM}mm", dpi)
-    max_reg_length_px = measurements.size_to_pixel(f"{MAX_REG_LENGTH_MM}mm", dpi)
-    min_reg_thickness_px = measurements.size_to_pixel(f"{MIN_REG_THICKNESS_MM}mm", dpi)
-    max_reg_thickness_px = measurements.size_to_pixel(f"{MAX_REG_THICKNESS_MM}mm", dpi)
-    max_reg_inset_px = measurements.size_to_pixel(f"{MAX_REG_INSET_MM}mm", dpi)
+    min_reg_length_px = Measurement.from_value(MIN_REG_LENGTH_MM, "mm").px(dpi)
+    max_reg_length_px = Measurement.from_value(MAX_REG_LENGTH_MM, "mm").px(dpi)
+    min_reg_thickness_px = Measurement.from_value(MIN_REG_THICKNESS_MM, "mm").px(dpi)
+    max_reg_thickness_px = Measurement.from_value(MAX_REG_THICKNESS_MM, "mm").px(dpi)
+    max_reg_inset_px = Measurement.from_value(MAX_REG_INSET_MM, "mm").px(dpi)
 
     # Constrain registration mark parameters within valid ranges.
     length_px = max(min_reg_length_px, min(length_px, max_reg_length_px))
@@ -112,10 +105,10 @@ def generate_reg_mark(
     draw = ImageDraw.Draw(img)
 
     # Corners to draw L's on.
-    corners = [CornerMatrix.BOTTOM_LEFT, CornerMatrix.TOP_RIGHT]
+    render_corners = [CornerMatrix.BOTTOM_LEFT, CornerMatrix.TOP_RIGHT]
 
     if registration == Registration.THREE:
-        five = measurements.size_to_pixel("5mm", dpi)
+        five = Measurement.parse("5mm").px(dpi)
         coords = [ (inset_px, inset_px), (inset_px + five, inset_px + five) ]
         print(f"Reg.THREE detected. Drawing rectangle at {coords}")
         draw.rectangle(
@@ -126,10 +119,10 @@ def generate_reg_mark(
         )
 
     else:  # Registration.FOUR
-        corners.append(CornerMatrix.TOP_LEFT)
-        corners.append(CornerMatrix.BOTTOM_RIGHT)
+        render_corners.append(CornerMatrix.TOP_LEFT)
+        render_corners.append(CornerMatrix.BOTTOM_RIGHT)
 
-    for corner in corners:
+    for corner in render_corners:
         print(f"Drawing corner: {corner.value}")
         x_dir, y_dir = corner.value
         x = inset_px if x_dir < 0 else paper_width_px - inset_px
@@ -355,7 +348,6 @@ def select_best_margins(
 # 4. Compute centered card positions
 # ─────────────────────────────────────────────────────────────────────────────
 
-
 def compute_card_positions(
     cols: int,
     rows: int,
@@ -385,12 +377,12 @@ def compute_card_positions(
 
 def generate_layout(
     orientation: Orientation,
-    card_width: str,
-    card_height: str,
-    paper_width: str,
-    paper_height: str,
-    inset: str,
-    length: str,
+    card_width: Measurement,
+    card_height: Measurement,
+    paper_width: Measurement,
+    paper_height: Measurement,
+    inset: Measurement,
+    length: Measurement,
     ppi: int,
 ):
     """
@@ -405,13 +397,13 @@ def generate_layout(
     CARD_DISTANCE = "1.25mm"
 
     # Convert all dimensions to pixels
-    page_width_px = measurements.size_to_pixel(paper_width, ppi)
-    page_height_px = measurements.size_to_pixel(paper_height, ppi)
-    card_width_px = measurements.size_to_pixel(card_width, ppi)
-    card_height_px = measurements.size_to_pixel(card_height, ppi)
-    card_distance_px = measurements.size_to_pixel(CARD_DISTANCE, ppi)
-    inset_px = measurements.size_to_pixel(inset, ppi)
-    length_px = measurements.size_to_pixel(length, ppi)
+    page_width_px = paper_width.px(ppi)
+    page_height_px = paper_height.px(ppi)
+    card_width_px = card_width.px(ppi)
+    card_height_px = card_height.px(ppi)
+    card_distance_px = Measurement.parse(CARD_DISTANCE).px(ppi)
+    inset_px = inset.px(ppi)
+    length_px = length.px(ppi)
 
     # Normalize orientation
     page_width_px, page_height_px = normalize_page_size(
@@ -448,12 +440,14 @@ def generate_layout(
     )
     max_length_mm = round(max_length_px * 25.4 / ppi, 2)
 
-    return CardLayout(
-        card_width_px=card_width_px,
-        card_height_px=card_height_px,
-        paper_width_px=page_width_px,
-        paper_height_px=page_height_px,
-        x_pos=x_pos,
-        y_pos=y_pos,
-        max_length_mm=max_length_mm,
+    return PageLayout(
+        card_width = card_width_px,
+        card_height = card_height_px,
+        paper_width = page_width_px,
+        paper_height = page_height_px,
+        x_pos = x_pos,
+        y_pos = y_pos,
+        max_length = max_length_mm,
     )
+
+    

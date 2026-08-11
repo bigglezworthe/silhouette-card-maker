@@ -7,185 +7,246 @@ from __future__ import annotations
 import json
 import os
 
-from src.measurements import size_to_mm
+from src.layout_models import (
+    CardLayoutDef,
+    CardSizeDef,
+    CardSizeDefs,
+    DefaultSettings,
+    LayoutDef,
+    LayoutDefs,
+    PaperLayoutDef,
+    PaperLayoutDefs,
+    PaperSizeDef,
+    PaperSizeDefs,
+    RegistrationSettings,
+    SpecialtyCardSizeDef,
+    SpecialtyLayoutDefs,
+    SpecialtyPaperSizeDef
+)
 from src.paths import Paths
-from src.enums import Orientation
+from src.enums import Orientation, Variant
 
-from typing import Any
+from typing import TypeVar
 from pathlib import Path
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel
 
-LAYOUTS_FILENAME = "layouts.json"
-LAYOUTS_PATH = Paths.assets / LAYOUTS_FILENAME
+T = TypeVar("T", bound=BaseModel)
+
+LAYOUTS_PATH = Paths.assets / "layouts"
+CARD_SIZE_DEF_PATH = Paths.assets / "card_sizes.json"
+PAPER_SIZE_DEF_PATH = Paths.assets / "paper_sizes.json"
+SPECIALTY_LAYOUTS_DEF_PATH = LAYOUTS_PATH / "specialty.json"
+DEFAULT_SETTINGS_PATH = Paths.assets / "defaults.json" 
+
 
 # Optional extra layout definitions to merge on top of layouts.json. Lets a layout-consuming
 # project layer its own card sizes, paper sizes, and layouts on top of this repo's without
 # modifying it. Opt-in: both are empty/unset by default, so load_layout_config() behaves
 # exactly as if this didn't exist. Two ways to supply extra files, merged in this order:
-#   1. Drop any number of *.json files into EXTRA_LAYOUTS_DIR (merged in filename order) -
+#   1. Drop any number of *.json files into USER_LAYOUTS_DIR (merged in filename order) -
 #      no configuration needed, just copy a file in.
-#   2. Point EXTRA_LAYOUTS_ENV at one or more file paths (os.pathsep-separated, merged in
-#      order) - for files that live outside EXTRA_LAYOUTS_DIR.
-EXTRA_LAYOUTS_PATH = Paths.assets / "extra_layouts"
-EXTRA_LAYOUTS_ENV = "SCM_EXTRA_LAYOUTS"
+#   2. Point USER_LAYOUTS_ENV at one or more file paths (os.pathsep-separated, merged in
+#      order) - for files that live outside USER_LAYOUTS_DIR.
+USER_LAYOUTS_PATH = LAYOUTS_PATH / "user"
+
+USER_CARD_SIZES_PATH = USER_LAYOUTS_PATH / "card_size"
+USER_PAPER_SIZES_PATH = USER_LAYOUTS_PATH / "paper_size"
+USER_PAPER_LAYOUTS_PATH = USER_LAYOUTS_PATH / "layout"
+USER_SPECIALTY_LAYOUTS_PATH = USER_LAYOUTS_PATH / "specialty"
+
+USER_LAYOUTS_ENV = "SCM_USER_LAYOUTS"
 
 # Optional override for where cutting templates get written/read (default: SCRIPT_DIR-relative
 # cutting_templates/ directories in generate_dxf.py and dxf_to_studio3.py).
 CUTTING_TEMPLATES_DIR_ENV = "SCM_CUTTING_TEMPLATES_DIR"
 
-# ============================
-# Classes
-# ============================
-# These classes set up structure to properly import the JSONs.
+# Priorty to use when sorting available paper sizes
+PAPER_SIZE_PRIORITY = ["letter", "tabloid", "a4", "a3", "arch_b"]
+CARD_SIZE_PRIORITY = ["standard", "poker", "bridge"]
 
-
-class RegistrationSettings(BaseModel):
-    inset: str | None = None
-    thickness: str | None = None
-    length: str | None = None
-
-
-class VariantRegistrationSettings(BaseModel):
-    default: RegistrationSettings
-    borderless: RegistrationSettings
-
-
-class DefaultSettings(BaseModel):
-    card_radius: str
-    registration: VariantRegistrationSettings
-
-
-class CardSizeDef(BaseModel):
-    width: str
-    height: str
-    radius: str | None = None
-    aliases: list[str] | None = None
-
-
-class PaperSizeDef(BaseModel):
-    width: str
-    height: str
-    aliases: list[str] | None = None
-
-    @model_validator(mode="after")
-    def validate_orientation(self) -> "PaperSizeDef":
-        if size_to_mm(self.width) < size_to_mm(self.height):
-            # [!] Why not just swap them?
-            raise ValueError(
-                f"Paper width ({self.width}) must be >= height ({self.height}). Paper sizes are stored as landscape."
-            )
-        return self
-
-
-class CardLayout(BaseModel):
-    orientation: Orientation
-    registration_orientation: Orientation | None = None
-    version: int
-    num_rows: int | None = None
-    num_cols: int | None = None
-    registration: RegistrationSettings | None = None
-
-
-class SpecialtyCardSizeDef(BaseModel):
-    name: str | None = None
-    width: str | None = None
-    height: str | None = None
-    radius: str | None = None
-
-
-class SpecialtyPaperSizeDef(BaseModel):
-    name: str | None = None
-    width: str | None = None
-    height: str | None = None
-
-
-class SpecialtyLayoutDef(BaseModel):
-    card_size: SpecialtyCardSizeDef
-    paper_size: SpecialtyPaperSizeDef
-    orientation: Orientation = Orientation.LANDSCAPE
-    registration_orientation: Orientation | None = None
-    version: int = 1
-    num_rows: int | None = None
-    num_cols: int | None = None
-    registration: RegistrationSettings | None = None
-
-
-class LayoutConfig(BaseModel):
-    ppi: int
-    defaults: DefaultSettings
-    card_sizes: dict[str, CardSizeDef]
-    paper_sizes: dict[str, PaperSizeDef]
-    layouts: dict[
-        str, dict[str, dict[str, CardLayout]]
-    ]  # layouts[paper][card][variant]
-    specialty_layouts: dict[str, SpecialtyLayoutDef] | None = None
-
+DEFAULT_ORIENTATION = Orientation.LANDSCAPE
 
 # ============================
-# Extra Layouts
+# User Layouts
 # ============================
-def extra_layout_paths() -> list[Path]:
-    dir_paths = sorted(EXTRA_LAYOUTS_PATH.glob("*.json"))
-    env_paths = [
-        Path(p) for p in os.getenv(EXTRA_LAYOUTS_ENV, "").split(os.pathsep) if p
-    ]
-    return dir_paths + env_paths
+def merge_unique_definitions(
+    base: dict[str, T],
+    extra: dict[str, T],
+    path: Path,
+) -> None:
+    for key, value in extra.items():
+        if key in base:
+            raise ValueError(f"'{key}' already defined by {path}.")
+        base[key] = value 
 
+def merge_user_card_sizes(card_sizes: CardSizeDefs) -> None:
+    for path in USER_CARD_SIZES_PATH.glob("*.json"):
+        extra = load_from_json(path, CardSizeDefs)
+        merge_unique_definitions(card_sizes.cards(), extra.root, path)
 
-def find_extra_layout_owner(section: str, key: str) -> Path | None:
-    for path in extra_layout_paths():
-        with path.open("r") as f:
-            if key in json.load(f).get(section, {}):
-                return path
-    return None
+def merge_user_paper_sizes(paper_sizes: PaperSizeDefs) -> None: 
+    for path in USER_PAPER_SIZES_PATH.glob("*.json"):
+        extra = load_from_json(path, PaperSizeDefs)
+        merge_unique_definitions(paper_sizes.papers(), extra.root, path)
 
+def merge_user_paper_layouts(paper_layouts: PaperLayoutDefs) -> None:
+    for path in USER_PAPER_LAYOUTS_PATH.glob("*.json"):
+        extra = load_from_json(path, PaperLayoutDef)
+        paper_size = path.stem.lower().strip()
+        if paper_size not in paper_layouts.papers():
+            paper_layouts[paper_size] = extra
+            continue
+        existing_paper = paper_layouts[paper_size]
+        for card_size, card_layouts in extra.root.items():
+            if card_size not in existing_paper.root:
+                existing_paper.cards()[card_size] = card_layouts
+                continue
 
-# [!] Need to figure out a solution for these type warnings. Should be able to use SpecialtyLayoutDef
-def merge_extra_layouts(raw_config: dict[str, Any]) -> dict[str, Any]:
-    for path in extra_layout_paths():
-        with path.open("r") as f:
-            extra = json.load(f)
+            existing_card = existing_paper.cards()[card_size]
+            for variant, layout in card_layouts.variants().items():
+                # [!] Why crash on collision? Let users override defaults. 
+                if variant in existing_card.root:
+                    raise ValueError(
+                        f"Collision in user layout '{path}': " 
+                        + f"{paper_size}/{card_size}/{variant}"
+                    )
+                existing_card.root[variant] = layout
 
-        for section in ("card_sizes", "paper_sizes"):
-            for key, value in extra.get(section, {}).items():
-                if key in raw_config[section]:
-                    raise ValueError(f"'{key}' in {section} of {path} already defined.")
-                raw_config[section][key] = value
-
-        for paper, cards in extra.get("layouts", {}).items():
-            for card, variants in cards.items():
-                for variant, layout_def in variants.items():
-                    if variant in raw_config["layouts"].get(paper, {}).get(
-                        card, {}
-                    ):
-                        raise ValueError(
-                            f"Layout '{paper}'/'{variant}' in {path} already defined."
-                        )
-                    raw_config["layouts"].setdefault(paper, {}).setdefault(
-                        card, {}
-                    )[variant] = layout_def
-    return raw_config
-
+def merge_user_specialty_layouts(specialty_layouts: SpecialtyLayoutDefs) -> None:
+    for path in USER_SPECIALTY_LAYOUTS_PATH.glob("*.json"):
+        extra = load_from_json(path, SpecialtyLayoutDefs)
+        merge_unique_definitions(specialty_layouts.root, extra.root, path)
 
 # ============================
 # Resolvers
 # ============================
+def resolve_specialty_card_size(
+    spec_card: SpecialtyCardSizeDef,
+    card_sizes: CardSizeDefs,
+) -> CardSizeDef:
+    if spec_card.name:
+        try:
+            base = card_sizes[spec_card.name]
+        except KeyError:
+            raise ValueError(f"Card size not found: {spec_card.name}")
+        base = card_sizes[spec_card.name]
+        return CardSizeDef(
+            width=spec_card.width or base.width,
+            height=spec_card.height or base.height,
+            radius=spec_card.radius or base.radius,
+        )
+    if (
+        spec_card.width is None
+        or spec_card.height is None
+        or spec_card.radius is None
+    ):
+        raise ValueError(
+            "Specialty card size must specify either a "
+            + "card size name or width, height, and radius."
+        )
+
+    return CardSizeDef(
+        width=spec_card.width,
+        height=spec_card.height,
+        radius=spec_card.radius,
+    )
+
+def resolve_specialty_paper_size(
+    spec_paper: SpecialtyPaperSizeDef,
+    paper_sizes: PaperSizeDefs,
+) -> PaperSizeDef:
+    if spec_paper.name:
+        try:
+            base = paper_sizes[spec_paper.name]
+        except KeyError:
+            raise ValueError(f"paper size not found: {spec_paper.name}")
+        base = paper_sizes[spec_paper.name]
+        return PaperSizeDef(
+            width=spec_paper.width or base.width,
+            height=spec_paper.height or base.height,
+        )
+    if spec_paper.width is None or spec_paper.height is None:
+        raise ValueError("Specialty paper size must specify either a paper size name or width and height.")
+
+    return PaperSizeDef(
+        width=spec_paper.width,
+        height=spec_paper.height,
+    ) 
+
+def resolve_specialty_layout(
+    spec_name: str,
+    layout_defs: LayoutDefs,
+) -> LayoutDef:
+    try:
+        spec_def = layout_defs.specialty_layouts[spec_name]
+    except KeyError:
+        raise ValueError(f"Specialty Layout does not exist: {spec_name}")
+    
+    card_size = resolve_specialty_card_size(spec_def.card_size, layout_defs.card_sizes)
+    paper_size = resolve_specialty_paper_size(spec_def.paper_size, layout_defs.paper_sizes)
+    
+    paper_name = spec_def.paper_size.name 
+
+    num_rows = spec_def.num_rows
+    num_cols = spec_def.num_cols
+    orientation = spec_def.orientation or DEFAULT_ORIENTATION
+    reg_orientation = spec_def.orientation or orientation
+    
+    if paper_name and paper_name in layout_defs.paper_layouts.papers():
+        paper_layout = layout_defs.paper_layouts[paper_name]
+        card_name = spec_def.paper_size.name 
+        if card_name and card_name in paper_layout.cards():
+            card_layouts = paper_layout.cards()[card_name]
+            if "default" in card_layouts.variants():
+                card_layout = card_layouts["default"]
+                num_rows = num_rows or card_layout.num_rows
+                num_cols = num_cols or card_layout.num_cols
+                reg_orientation = reg_orientation or card_layout.orientation
+
+    return LayoutDef(
+        card_size = card_size,
+        paper_size = paper_size,
+        orientation = orientation, 
+        registration_orientation = reg_orientation,
+        version = spec_def.version,
+        num_rows = num_rows,
+        num_cols = num_cols,
+        registration = spec_def.registration
+    )
+
+def resolve_layout( 
+    card_name: str, 
+    paper_name: str,
+    variant: Variant,
+    layouts: LayoutDefs,
+) -> LayoutDef:
+
+    card_layout = load_card_layout(card_name, paper_name, variant)
+    return LayoutDef(
+        card_size = layouts.card_sizes[card_name],
+        paper_size = layouts.paper_sizes[paper_name],
+        orientation = card_layout.orientation,
+        registration_orientation=card_layout.registration_orientation,
+        version = card_layout.version,
+        num_rows = card_layout.num_rows,
+        num_cols = card_layout.num_cols,
+        registration = card_layout.registration,
+    )
+
 def resolve_cutting_templates_dir(default: Path) -> Path:
     override = os.getenv(CUTTING_TEMPLATES_DIR_ENV)
     return Path(override) if override else default
 
-
-def resolve_card_size_alias(layout_config: LayoutConfig, card_size: str) -> str:
-    for name, card_def in layout_config.card_sizes.items():
+def resolve_card_size_alias(card_sizes: CardSizeDefs, card_size: str) -> str:
+    for name, card_def in card_sizes.cards().items():
         if card_def.aliases and (card_size in card_def.aliases):
             print(
                 f"Card size '{card_size}' is an alias of '{name}'. Using '{name}' card size and cutting template."
             )
     return card_size
 
-
-def resolve_paper_size_alias(layout_config: LayoutConfig, paper_size: str) -> str:
-    for name, paper_def in layout_config.paper_sizes.items():
+def resolve_paper_size_alias(paper_sizes: PaperSizeDefs, paper_size: str) -> str:
+    for name, paper_def in paper_sizes.papers().items():
         if paper_def.aliases and (paper_size in paper_def.aliases):
             print(
                 f"Paper size '{paper_size}' is an alias of '{name}'. Using '{name}' paper size and cutting template."
@@ -193,42 +254,82 @@ def resolve_paper_size_alias(layout_config: LayoutConfig, paper_size: str) -> st
             return name
     return paper_size
 
-
 # ============================
 # Get All's
 # ============================
-# [!] Should probably just be class methods for LayoutConfig
-def get_all_card_size_names(layout_config: LayoutConfig) -> list[str]:
-    names = list(layout_config.card_sizes.keys())
-    for card_def in layout_config.card_sizes.values():
-        if card_def.aliases:
-            names.extend(card_def.aliases)
+def get_all_card_size_names() -> list[str]:
+    card_sizes = load_card_sizes()
+    names = card_sizes.names()
+    for card_size in card_sizes.cards().values():
+        if card_size.aliases:
+            names.extend(card_size.aliases)
     return biased_sort(names, ["standard", "poker", "bridge"])
 
+def get_all_paper_size_names() -> list[str]:
+    paper_sizes = load_paper_sizes()
+    names = paper_sizes.names()
 
-def get_all_paper_size_names(layout_config: LayoutConfig) -> list[str]:
-    names = list(layout_config.paper_sizes.keys())
-    for paper_def in layout_config.paper_sizes.values():
-        if paper_def.aliases:
-            names.extend(paper_def.aliases)
-    return biased_sort(names, ["letter", "tabloid", "a4", "a3", "arch_b"])
+    for paper_size in paper_sizes.papers().values():
+        if paper_size.aliases:
+            names.extend(paper_size.aliases)
+    return biased_sort(names, PAPER_SIZE_PRIORITY)
 
-
-def get_all_specialty_layout_names(layout_config: LayoutConfig) -> list[str]:
-    if layout_config.specialty_layouts:
-        return sorted(layout_config.specialty_layouts.keys())
+def get_all_specialty_layout_names() -> list[str]:
+    specialty_layouts = load_specialty_layouts()
+    if specialty_layouts: 
+        return sorted(specialty_layouts.names())
     return []
-
 
 # ============================
 # Load Config
 # ============================
-def load_layout_config() -> LayoutConfig:
-    with open(LAYOUTS_PATH, "r") as f:
-        raw_config = json.load(f)
-    merge_extra_layouts(raw_config)
-    return LayoutConfig(**raw_config)
+def load_from_json(path: Path, model: type[T]) -> T:
+    with open(path, 'r') as f:
+        data: object = json.load(f)
+    return model.model_validate(data)
 
+def load_card_sizes() -> CardSizeDefs:
+    card_sizes = load_from_json(CARD_SIZE_DEF_PATH, CardSizeDefs)
+    merge_user_card_sizes(card_sizes)
+    return card_sizes
+
+def load_paper_sizes() -> PaperSizeDefs:
+    paper_sizes = load_from_json(PAPER_SIZE_DEF_PATH, PaperSizeDefs)
+    merge_user_paper_sizes(paper_sizes)
+    return paper_sizes
+
+def load_paper_layout(paper_size: str) -> PaperLayoutDef:
+    layout_path = LAYOUTS_PATH / (paper_size + ".json")
+    return load_from_json(layout_path, PaperLayoutDef)
+
+def load_card_layout(card_size: str, paper_size: str, reg_variant: Variant = Variant.DEFAULT) -> CardLayoutDef:
+    return load_paper_layout(paper_size).card(card_size).variant(reg_variant)
+
+def load_paper_layouts() -> PaperLayoutDefs:
+    paper_layouts: dict[str, PaperLayoutDef] = {}
+    for path in LAYOUTS_PATH.glob("*.json"):
+        paper_layouts[path.stem.lower().strip()] = load_from_json(path, PaperLayoutDef)
+
+    paper_layout_defs = PaperLayoutDefs(paper_layouts)
+    merge_user_paper_layouts(paper_layout_defs)
+    return paper_layout_defs
+
+
+def load_specialty_layouts() -> SpecialtyLayoutDefs: 
+    specialty_layouts = load_from_json(SPECIALTY_LAYOUTS_DEF_PATH, SpecialtyLayoutDefs)
+    merge_user_specialty_layouts(specialty_layouts)
+    return specialty_layouts
+
+def load_defaults() -> DefaultSettings:
+    return load_from_json(DEFAULT_SETTINGS_PATH, DefaultSettings)    
+
+def load_layouts() -> LayoutDefs:
+    return LayoutDefs(
+        card_sizes=load_card_sizes(), 
+        paper_sizes=load_paper_sizes(), 
+        paper_layouts=load_paper_layouts(), 
+        specialty_layouts=load_specialty_layouts(),
+    )
 
 # ============================
 # Misc

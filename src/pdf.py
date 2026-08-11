@@ -10,11 +10,10 @@ from natsort import natsorted
 
 from src import page_manager
 
-from pathlib import Path
 from PIL import Image, ImageFont, ImageDraw
 
-from src import measurements
-from src.draw import draw_card_layouts, draw_outlines
+from src.measurements import Measurement, MeasureUnits
+from src.draw import CardRenderOptions, draw_card_layouts, draw_outlines
 from src.enums import FitMode, Orientation, OrientationMode, Registration, Variant
 from src.images import (
     MINIMUM_BLEED,
@@ -24,22 +23,21 @@ from src.images import (
     parse_dimension_string,
 )
 from src.layouts import (
-    PaperSizeDef,
-    RegistrationSettings,
-    load_layout_config,
-    CardSizeDef,
-    resolve_card_size_alias,
-    resolve_paper_size_alias,
+    DEFAULT_ORIENTATION,
+    load_defaults,
+    load_layouts,
+    resolve_layout,
+    resolve_specialty_layout,
 )
 from src.offset import load_saved_offset
 from src.paths import (
+    ImagePaths,
     Paths,
     check_paths_subset,
-    ensure_output_directory_exists,
-    get_back_card_image_path,
     get_directory,
     get_image_file_paths,
     resolve_image_with_any_extension,
+    select_back_card_image_path,
 )
 
 
@@ -59,7 +57,7 @@ def add_front_back_pages(
     ppi_ratio: float,
     template: str,
     only_fronts: bool,
-    label: str | None,
+    label: str,
     orientation: Orientation,
     label_margin_px: int,
 ) -> None:
@@ -69,8 +67,8 @@ def add_front_back_pages(
         num_sheet = int(len(pages) / 2) + 1
 
     label_text = f"sheet: {num_sheet}, template: {template}"
-    if label is not None:
-        label_text = f"label: {label}, {label_text}"
+    if len(label):
+        label_text = f"{label}, {label_text}"
 
     # Label goes on short side of paper opposite top-left black square
     if orientation == Orientation.LANDSCAPE:
@@ -113,6 +111,7 @@ def find_best_orientation(
     ppi: int,
     preferred: Orientation = Orientation.LANDSCAPE,
 ) -> tuple[Orientation, page_manager.CardLayout]:
+    # [!] Need to package this more reasonably
     kwargs = dict(
         card_width=card_width,
         card_height=card_height,
@@ -153,32 +152,20 @@ def find_best_orientation(
 
 
 def generate_pdf(
-    front_dir_path: str,
-    back_dir_path: str,
-    ds_dir_path: str,
-    output_path: str,
+    image_paths: ImagePaths,
     output_images: bool,
-    card_size: str,
-    paper_size: str,
+    card_name: str,
+    paper_name: str,
     registration: Registration,
     only_fronts: bool,
-    fit: FitMode,
-    fit_backs: FitMode | None,
-    crop_string: str | None,
-    crop_backs_string: str | None,
-    extend_edges: str | None,
-    extend_edges_backs: str | None,
-    extend_corners: str | None,
-    extend_corners_backs: str | None,
-    extend_bleed: str | None,
-    extend_bleed_backs: str | None,
+    render_opts: CardRenderOptions,
     ppi: int,
     quality: int,
     skip_indices: list[int],
     load_offset: bool,
     label: str,
+    specialty_name: str | None,
     show_outline: bool = False,
-    specialty: str | None = None,
     borderless: bool = False,
     registration_orientation_override: str | None = None,
 ) -> None:
@@ -186,181 +173,100 @@ def generate_pdf(
     # ==============================
     # File ops
     # ==============================
-    f_path = Path(front_dir_path)
-    if not f_path.is_dir():
-        raise FileNotFoundError(f"Invalid front image directory: {f_path}")
-    b_path = Path(back_dir_path)
-    if not b_path.is_dir():
-        raise FileNotFoundError(f"Invalid back image directory: {b_path}")
-    ds_path = Path(ds_dir_path)
-    if not ds_path.is_dir():
-        raise FileNotFoundError(f"Invalid double-sided image directory: {ds_path}")
-
-    o_path = Path(output_path)
     if output_images:
-        o_path = get_directory(o_path)
+        image_paths.output = get_directory(image_paths.output)
     else:
-        if not o_path.name.lower().endswith(".pdf"):
-            raise FileNotFoundError(f"Invalid PDF output path: {o_path}")
-        ensure_output_directory_exists(o_path)
-    output_path = str(o_path)
+        if not image_paths.output.name.lower().endswith(".pdf"):
+            raise FileNotFoundError(f"Invalid PDF output path: {image_paths.output}")
+        if image_paths.output.parent:
+            image_paths.output.parent.mkdir(parents=True, exist_ok=True)
 
-    back_card_image_path = None
     use_default_back_page = True
     if not only_fronts:
-        back_card_image_path = get_back_card_image_path(back_dir_path)
-        use_default_back_page = back_card_image_path is None
+        image_paths.back_image_path = select_back_card_image_path(image_paths.back)
+        use_default_back_page = image_paths.back_image_path is None
         if use_default_back_page:
-            print(f"No back image provided in back image directory: {back_dir_path}")
+            print(f"No back image provided in back image directory: {image_paths.back}")
 
-    front_image_filenames = get_image_file_paths(front_dir_path)
-    ds_image_filenames = get_image_file_paths(ds_dir_path)
+    image_paths.front_image_paths = get_image_file_paths(image_paths.front)
+    image_paths.double_image_paths = get_image_file_paths(image_paths.double)
 
-    front_set = set(front_image_filenames)
-    ds_set = set(ds_image_filenames)
+    front_set = set(image_paths.front_image_paths)
+    ds_set = set(image_paths.double_image_paths)
     diff = check_paths_subset(ds_set, front_set)
     if len(diff) > 0:
         raise Exception(
-            f'Double-sided backs "{ds_set - front_set}" do not have matching fronts. Add the missing fronts to front image directory: {front_dir_path}'
+            f'Double-sided backs "{ds_set - front_set}" do not have matching fronts.'
+            + f'Add the missing fronts to front image directory: {image_paths.front}'
         )
 
     if only_fronts:
         if len(ds_set) > 0:
             raise Exception(
-                f'Cannot use "--only_fronts" with double-sided cards. Remove cards from double_side image directory: {ds_dir_path}'
+                'Cannot use "--only_fronts" with double-sided cards.' 
+                + f'Remove cards from double_side image directory: {image_paths.double}'
             )
 
     # ==============================
     # Layout
     # ==============================
-    layout_config = load_layout_config()
-    default_reg = layout_config.defaults.registration.default
+    layout_defs = load_layouts()
+    defaults = load_defaults()
+
+    variant = Variant.BORDERLESS if borderless else Variant.DEFAULT
+    default_reg = defaults.registration.borderless if borderless else defaults.registration.default
     registration_orientation_override = (
         Orientation(registration_orientation_override)
         if registration_orientation_override is not None
         else None
     )
 
-    if borderless and specialty:
+    if borderless and specialty_name:
         raise Exception(
             "Cannot use --borderless with --specialty. Specialty layouts define their own geometry."
         )
 
-    if specialty:
-        if (
-            not layout_config.specialty_layouts
-            or specialty not in layout_config.specialty_layouts
-        ):
-            raise Exception(f'Specialty layout "{specialty}" not found.')
-        spec = layout_config.specialty_layouts[specialty]
-
-        if spec.card_size.name:
-            if spec.card_size.name not in layout_config.card_sizes:
-                raise Exception(f"Card size not found: {spec.card_size.name}")
-            base = layout_config.card_sizes[spec.card_size.name]
-            card_size_def = CardSizeDef(
-                width=base.width,
-                height=base.height,
-                radius=spec.card_size.radius or base.radius,
-            )
-        else:
-            card_size_def = CardSizeDef(
-                width=spec.card_size.width or "",
-                height=spec.card_size.height or "",
-                radius=spec.card_size.radius,
-            )
-
-        if spec.paper_size.name:
-            if spec.paper_size.name not in layout_config.paper_sizes:
-                raise Exception(f"Paper size not found: {spec.paper_size.name}")
-            paper_size_def = layout_config.paper_sizes[spec.paper_size.name]
-        else:
-            paper_size_def = PaperSizeDef(
-                width=spec.paper_size.width or "",
-                height=spec.paper_size.height or "",
-            )
-
-        orientation = spec.orientation
-        registration_orientation = spec.registration_orientation or orientation
-
-        if registration_orientation_override is not None:
-            registration_orientation = registration_orientation_override
-        template = f"{specialty}-v{spec.version}"
-
-        lr = spec.registration or RegistrationSettings()
-        effective_inset = lr.inset or default_reg.inset
-
+    if specialty_name:
+        layout_def = resolve_specialty_layout(specialty_name, layout_defs)
     else:
-        card_size = resolve_card_size_alias(layout_config, card_size)
-        paper_size = resolve_paper_size_alias(layout_config, paper_size)
+        layout_def = resolve_layout(card_name, paper_name, variant, layout_defs)
+        template = create_template_name(paper_name, card_name, variant, layout_def.version)
 
-        if card_size not in layout_config.card_sizes:
-            raise Exception(
-                f'Unsupported card size "{card_size}". Try card sizes: {list(layout_config.card_sizes.keys())}'
-            )
-        card_size_def = layout_config.card_sizes[card_size]
-
-        if paper_size not in layout_config.paper_sizes:
-            raise Exception(
-                f'Unsupported paper size "{paper_size}". Try paper sizes: {list(layout_config.paper_sizes.keys())}'
-            )
-        paper_size_def = layout_config.paper_sizes[paper_size]
-
-        variant = Variant.BORDERLESS if borderless else Variant.DEFAULT
-
-        if (
-            paper_size not in layout_config.layouts
-            or card_size not in layout_config.layouts[paper_size]
-        ):
-            raise Exception(
-                f'No layout defined for paper "{paper_size}" with card "{card_size}". Add it to layouts.json.'
-            )
-
-        card_layouts = layout_config.layouts[paper_size][card_size]
-        if variant.value not in card_layouts:
-            raise Exception(
-                f'No {variant.value} layout defined for paper "{paper_size}" with card "{card_size}". Add it to layouts.json.'
-            )
-
-        layout_def = card_layouts[variant.value]
-        orientation = layout_def.orientation
-        registration_orientation = layout_def.registration_orientation or orientation
-        if registration_orientation_override is not None:
-            registration_orientation = registration_orientation_override
-        version = layout_def.version
-
-        layout_reg = layout_def.registration
-        lr = layout_reg or RegistrationSettings()
-
-        if borderless:
-            effective_inset = (
-                lr.inset or layout_config.defaults.registration.borderless.inset
-            )
-        else:
-            effective_inset = (
-                lr.inset or layout_config.defaults.registration.default.inset
-            )
-
-        template = create_template_name(paper_size, card_size, variant, version)
-
+    if registration_orientation_override:
+        layout_def.registration_orientation = registration_orientation_override
+    
+    layout_def.orientation = layout_def.orientation or DEFAULT_ORIENTATION
+    layout_def.registration_orientation = layout_def.registration_orientation or layout_def.orientation
     # ==============================
     # Image modification
     # ==============================
-    effective_thickness = lr.thickness or default_reg.thickness
-    effective_length = lr.length or default_reg.length
+    effective_thickness = default_reg.thickness
+    effective_length = default_reg.length
+    effective_inset = default_reg.inset
 
+    if layout_def.registration is not None: 
+        effective_thickness = layout_def.registration.thickness
+        effective_length = layout_def.registration.length
+        effective_inset = layout_def.registration.inset
+
+    # [!] This value is extremely suspicious. Why is it default_reg.length instead of effective_length?
     total_exclusion_mm = (
-        measurements.size_to_mm(default_reg.length) + page_manager.REG_PADDING_MM
+        default_reg.length.to(MeasureUnits.MM).value + page_manager.REG_PADDING_MM
     )
+    total_exclusion = Measurement.from_value(total_exclusion_mm, MeasureUnits.MM)
+
+    card_size_def = layout_defs.card_sizes[card_name]
+    paper_size_def = layout_defs.paper_sizes[paper_name]
+
     computed = page_manager.generate_layout(
-        orientation=orientation,
+        orientation=layout_def.orientation,
         card_width=card_size_def.width,
         card_height=card_size_def.height,
         paper_width=paper_size_def.width,
         paper_height=paper_size_def.height,
-        inset=effective_inset or "",
-        length=f"{total_exclusion_mm}mm",
-        ppi=layout_config.ppi,
+        inset=effective_inset,
+        length=total_exclusion,
+        ppi=ppi,
     )
 
     card_width_px = computed.card_width_px
@@ -370,28 +276,28 @@ def generate_pdf(
     x_pos = computed.x_pos
     y_pos = computed.y_pos
 
-    crop = parse_crop_string(crop_string, card_width_px, card_height_px)
+    crop_x = render_opts.front.crop
     crop_backs = parse_crop_string(crop_backs_string, card_width_px, card_height_px)
 
-    extend_edges_px = parse_dimension_string(extend_edges, layout_config.ppi)
+    extend_edges_px = parse_dimension_string(extend_edges, ppi)
     extend_edges_backs_px = parse_dimension_string(
-        extend_edges_backs, layout_config.ppi
+        extend_edges_backs, ppi
     )
 
-    extend_corners_px = parse_dimension_string(extend_corners, layout_config.ppi)
+    extend_corners_px = parse_dimension_string(extend_corners, ppi)
     extend_corners_backs_px = parse_dimension_string(
-        extend_corners_backs, layout_config.ppi
+        extend_corners_backs, ppi
     )
 
-    extend_bleed_px = parse_dimension_string(extend_bleed, layout_config.ppi)
+    extend_bleed_px = parse_dimension_string(extend_bleed, ppi)
     extend_bleed_backs_px = parse_dimension_string(
-        extend_bleed_backs, layout_config.ppi
+        extend_bleed_backs, ppi
     )
 
     fit_backs_mode = FitMode(fit_backs) if fit_backs is not None else fit
 
-    effective_card_radius = card_size_def.radius or layout_config.defaults.card_radius
-    radius_px = measurements.size_to_pixel(effective_card_radius, layout_config.ppi)
+    effective_card_radius = card_size_def.radius or defaults.card_radius
+    radius_px = measurements.size_to_pixel(effective_card_radius, ppi)
 
     # ==============================
     # PDF
@@ -414,11 +320,11 @@ def generate_pdf(
         )
 
     if len(clean_skip_indices) == num_cards:
-        raise Exception("You cannot skip all cards per page!")
+        raise ValueError("You cannot skip all cards per page!")
 
     ppi_ratio = ppi / 300
-    inset_px = measurements.size_to_pixel(effective_inset, layout_config.ppi)
-    thickness_px = measurements.size_to_pixel(effective_thickness, layout_config.ppi)
+    inset_px = measurements.size_to_pixel(effective_inset, ppi)
+    thickness_px = measurements.size_to_pixel(effective_thickness, ppi)
     if borderless:
         label_margin_px = math.floor(inset_px * ppi_ratio)
     else:
@@ -437,7 +343,7 @@ def generate_pdf(
         effective_inset or "",
         effective_thickness or "",
         effective_length or "",
-        layout_config.ppi,
+        ppi,
         registration,
     ) as reg_im:
         reg_im = reg_im.resize(

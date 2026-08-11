@@ -1,0 +1,92 @@
+{
+    "american_mini": {
+        "width": "41mm",
+        "height": "63mm",
+        "aliases": [
+            "mini_american"
+        ]
+    },
+    "bridge": {
+        "width": "2.25in",
+        "height": "3.5in"
+    },
+    "bridge_square": {
+        "width": "2.25in",
+        "height": "2.25in"
+    },
+    "catan": {
+        "width": "54mm",
+        "height": "80mm"
+    },
+    "business": {
+        "width": "3.5in",
+        "height": "2in"
+    },
+    "credit": {
+        "width": "3.375in",
+        "height": "2.125in",
+        "radius": "0.125in"
+    },
+    "domino": {
+        "width": "1.75in",
+        "height": "3.5in"
+    },
+    "domino_square": {
+        "width": "1.75in",
+        "height": "1.75in"
+    },
+    "euro_business": {
+        "width": "85mm",
+        "height": "55mm",
+        "aliases": [
+            "photo"
+        ]
+    },
+    "euro_mini": {
+        "width": "44mm",
+        "height": "68mm",
+        "aliases": [
+            "mini_euro"
+        ]
+    },
+    "japanese": {
+        "width": "59mm",
+        "height": "86mm",
+        "radius": "1mm"
+    },
+    "jumbo": {
+        "width": "3.5in",
+        "height": "5.5in"
+    },
+    "micro": {
+        "width": "1.25in",
+        "height": "1.75in"
+    },
+    "mini": {
+        "width": "1.75in",
+        "height": "2.5in"
+    },
+    "poker": {
+        "width": "2.5in",
+        "height": "3.5in"
+    },
+    "standard": {
+        "width": "63mm",
+        "height": "88mm",
+        "aliases": [
+            "euro_poker"
+        ]
+    },
+    "standard_double": {
+        "width": "88mm",
+        "height": "126mm"
+    },
+    "tarot": {
+        "width": "2.75in",
+        "height": "4.75in"
+    },
+    "70mm_square": {
+        "width": "70mm",
+        "height": "70mm"
+    }
+}

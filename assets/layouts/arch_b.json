@@ -1,0 +1,382 @@
+{
+    "bridge": {
+        "default": {
+            "orientation": "landscape",
+            "version": 2,
+            "num_rows": 3,
+            "num_cols": 7,
+            "registration": {
+                "length": "13.46mm"
+            }
+        },
+        "borderless": {
+            "orientation": "landscape",
+            "version": 2,
+            "num_rows": 3,
+            "num_cols": 7,
+            "registration": {
+                "length": "20.49mm"
+            }
+        }
+    },
+    "bridge_square": {
+        "default": {
+            "orientation": "landscape",
+            "version": 3,
+            "num_rows": 4,
+            "num_cols": 7,
+            "registration": {
+                "length": "24.98mm"
+            }
+        },
+        "borderless": {
+            "orientation": "landscape",
+            "version": 2,
+            "num_rows": 5,
+            "num_cols": 7,
+            "registration": {
+                "length": "20.49mm"
+            }
+        }
+    },
+    "business": {
+        "default": {
+            "orientation": "portrait",
+            "version": 2,
+            "num_rows": 8,
+            "num_cols": 3,
+            "registration": {
+                "length": "9.74mm"
+            }
+        },
+        "borderless": {
+            "orientation": "landscape",
+            "version": 2,
+            "num_rows": 5,
+            "num_cols": 5,
+            "registration": {
+                "length": "18.63mm"
+            }
+        }
+    },
+    "credit": {
+        "default": {
+            "orientation": "portrait",
+            "version": 2,
+            "num_rows": 7,
+            "num_cols": 3,
+            "registration": {
+                "length": "24.47mm"
+            }
+        },
+        "borderless": {
+            "orientation": "landscape",
+            "version": 2,
+            "num_rows": 5,
+            "num_cols": 5,
+            "registration": {
+                "length": "10.58mm"
+            }
+        }
+    },
+    "domino": {
+        "default": {
+            "orientation": "landscape",
+            "version": 2,
+            "num_rows": 3,
+            "num_cols": 9,
+            "registration": {
+                "length": "12.28mm"
+            }
+        },
+        "borderless": {
+            "orientation": "portrait",
+            "version": 2,
+            "num_rows": 5,
+            "num_cols": 6,
+            "registration": {
+                "length": "11.68mm"
+            }
+        }
+    },
+    "domino_square": {
+        "default": {
+            "orientation": "landscape",
+            "version": 3,
+            "num_rows": 6,
+            "num_cols": 9,
+            "registration": {
+                "length": "12.28mm"
+            }
+        },
+        "borderless": {
+            "orientation": "landscape",
+            "version": 2,
+            "num_rows": 6,
+            "num_cols": 9,
+            "registration": {
+                "length": "19.3mm"
+            }
+        }
+    },
+    "euro_business": {
+        "default": {
+            "orientation": "portrait",
+            "version": 2,
+            "num_rows": 7,
+            "num_cols": 3,
+            "registration": {
+                "length": "20.91mm"
+            }
+        },
+        "borderless": {
+            "orientation": "landscape",
+            "version": 2,
+            "num_rows": 5,
+            "num_cols": 5,
+            "registration": {
+                "length": "9.31mm"
+            }
+        }
+    },
+    "euro_mini": {
+        "default": {
+            "orientation": "landscape",
+            "version": 2,
+            "num_rows": 4,
+            "num_cols": 9,
+            "registration": {
+                "length": "14.14mm"
+            }
+        },
+        "borderless": {
+            "orientation": "landscape",
+            "version": 2,
+            "num_rows": 4,
+            "num_cols": 9,
+            "registration": {
+                "length": "21.17mm"
+            }
+        }
+    },
+    "japanese": {
+        "default": {
+            "orientation": "landscape",
+            "version": 2,
+            "num_rows": 3,
+            "num_cols": 7,
+            "registration": {
+                "length": "10.84mm"
+            }
+        },
+        "borderless": {
+            "orientation": "landscape",
+            "version": 2,
+            "num_rows": 3,
+            "num_cols": 7,
+            "registration": {
+                "length": "17.86mm"
+            }
+        }
+    },
+    "jumbo": {
+        "default": {
+            "orientation": "portrait",
+            "version": 3,
+            "num_rows": 3,
+            "num_cols": 3,
+            "registration": {
+                "length": "6.52mm"
+            }
+        },
+        "borderless": {
+            "orientation": "landscape",
+            "version": 2,
+            "num_rows": 2,
+            "num_cols": 5,
+            "registration": {
+                "length": "7.79mm"
+            }
+        }
+    },
+    "micro": {
+        "default": {
+            "orientation": "landscape",
+            "version": 2,
+            "num_rows": 6,
+            "num_cols": 12,
+            "registration": {
+                "length": "19.9mm"
+            }
+        },
+        "borderless": {
+            "orientation": "portrait",
+            "version": 2,
+            "num_rows": 9,
+            "num_cols": 9,
+            "registration": {
+                "length": "19.3mm"
+            }
+        }
+    },
+    "mini": {
+        "default": {
+            "orientation": "landscape",
+            "version": 2,
+            "num_rows": 4,
+            "num_cols": 9,
+            "registration": {
+                "length": "12.28mm"
+            }
+        },
+        "borderless": {
+            "orientation": "landscape",
+            "version": 2,
+            "num_rows": 4,
+            "num_cols": 9,
+            "registration": {
+                "length": "19.3mm"
+            }
+        }
+    },
+    "poker": {
+        "default": {
+            "orientation": "landscape",
+            "version": 2,
+            "num_rows": 3,
+            "num_cols": 6,
+            "registration": {
+                "length": "23.62mm"
+            }
+        },
+        "borderless": {
+            "orientation": "portrait",
+            "version": 2,
+            "num_rows": 5,
+            "num_cols": 4,
+            "registration": {
+                "length": "19.3mm"
+            }
+        }
+    },
+    "standard": {
+        "default": {
+            "orientation": "landscape",
+            "version": 4,
+            "num_rows": 3,
+            "num_cols": 6,
+            "registration": {
+                "length": "25.15mm"
+            }
+        },
+        "borderless": {
+            "orientation": "landscape",
+            "version": 2,
+            "num_rows": 3,
+            "num_cols": 7,
+            "registration": {
+                "length": "14.9mm"
+            }
+        }
+    },
+    "standard_double": {
+        "default": {
+            "orientation": "portrait",
+            "version": 2,
+            "num_rows": 3,
+            "num_cols": 3,
+            "registration": {
+                "length": "27.09mm"
+            }
+        },
+        "borderless": {
+            "orientation": "landscape",
+            "version": 2,
+            "num_rows": 2,
+            "num_cols": 5,
+            "registration": {
+                "length": "21.51mm"
+            }
+        }
+    },
+    "tarot": {
+        "default": {
+            "orientation": "landscape",
+            "version": 3,
+            "num_rows": 2,
+            "num_cols": 6,
+            "registration": {
+                "length": "19.9mm"
+            }
+        },
+        "borderless": {
+            "orientation": "landscape",
+            "version": 2,
+            "num_rows": 2,
+            "num_cols": 6,
+            "registration": {
+                "length": "26.92mm"
+            }
+        }
+    },
+    "american_mini": {
+        "default": {
+            "orientation": "landscape",
+            "version": 2,
+            "num_rows": 4,
+            "num_cols": 10,
+            "registration": {
+                "length": "13.29mm"
+            }
+        },
+        "borderless": {
+            "orientation": "portrait",
+            "version": 2,
+            "num_rows": 7,
+            "num_cols": 6,
+            "registration": {
+                "length": "22.01mm"
+            }
+        }
+    },
+    "catan": {
+        "default": {
+            "orientation": "portrait",
+            "version": 2,
+            "num_rows": 5,
+            "num_cols": 5,
+            "registration": {
+                "length": "14.82mm"
+            }
+        },
+        "borderless": {
+            "orientation": "portrait",
+            "version": 2,
+            "num_rows": 5,
+            "num_cols": 5,
+            "registration": {
+                "length": "21.84mm"
+            }
+        }
+    },
+    "70mm_square": {
+        "default": {
+            "orientation": "landscape",
+            "version": 2,
+            "num_rows": 4,
+            "num_cols": 5,
+            "registration": {
+                "length": "39.71mm"
+            }
+        },
+        "borderless": {
+            "orientation": "landscape",
+            "version": 2,
+            "num_rows": 4,
+            "num_cols": 6,
+            "registration": {
+                "length": "11.18mm"
+            }
+        }
+    }
+}
