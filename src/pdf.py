@@ -223,7 +223,8 @@ def generate_pdf(
 
     if borderless and specialty_name:
         raise Exception(
-            "Cannot use --borderless with --specialty. Specialty layouts define their own geometry."
+            "Cannot use --borderless with --specialty."
+            + "Specialty layouts define their own geometry."
         )
 
     if specialty_name:
@@ -258,25 +259,23 @@ def generate_pdf(
     card_size_def = layout_defs.card_sizes[card_name]
     paper_size_def = layout_defs.paper_sizes[paper_name]
 
-    computed = page_manager.generate_layout(
+    page_layout = page_manager.generate_layout(
         orientation=layout_def.orientation,
-        card_width=card_size_def.width,
-        card_height=card_size_def.height,
-        paper_width=paper_size_def.width,
-        paper_height=paper_size_def.height,
-        inset=effective_inset,
-        length=total_exclusion,
-        ppi=ppi,
+        card_size=(card_size_def.width.px(ppi), card_size_def.height.px(ppi)),
+        paper_size=(paper_size_def.width.px(ppi), paper_size_def.height.px(ppi)),
+        inset=effective_inset.px(ppi),
+        length=total_exclusion.px(ppi),
     )
 
-    card_width_px = computed.card_width_px
-    card_height_px = computed.card_height_px
-    page_width_px = computed.paper_width_px
-    page_height_px = computed.paper_height_px
-    x_pos = computed.x_pos
-    y_pos = computed.y_pos
+    card_width_px = page_layout.card_width_px
+    card_height_px = page_layout.card_height_px
+    page_width_px = page_layout.paper_width_px
+    page_height_px = page_layout.paper_height_px
+    x_pos = page_layout.x_pos
+    y_pos = page_layout.y_pos
 
-    crop_x = render_opts.front.crop
+    
+    crop_size = calculate_crop_size(render_opts.front.crop, page_layout.card_size)
     crop_backs = parse_crop_string(crop_backs_string, card_width_px, card_height_px)
 
     extend_edges_px = parse_dimension_string(extend_edges, ppi)

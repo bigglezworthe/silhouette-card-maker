@@ -51,6 +51,16 @@ class MeasureUnits(str, Enum):
 DEFAULT_UNIT = MeasureUnits.MM 
 
 @dataclass(frozen=True)
+class MeasureSize:
+    width: Measurement
+    height: Measurement
+
+@dataclass(frozen=True)
+class PixelMeasureSize:
+    width: PixelMeasureSize
+    height: PixelMeasureSize
+
+@dataclass(frozen=True)
 class Measurement:
     value: float = 0
     unit: MeasureUnits = DEFAULT_UNIT
@@ -94,13 +104,13 @@ class Measurement:
         unit = cls._coerce_unit(unit)
         return cls(value, unit)
 
-    def to(self, unit: MeasureUnits | str, ppi: int = DEFAULT_PPI) -> Self:
+    def to(self, unit: MeasureUnits | str, ppi: int = DEFAULT_PPI) -> Measurement:
         unit = self._coerce_unit(unit)
 
         if self.unit == unit:
             return self
 
-        value = self.value
+        value = float(self.value)
 
         # convert to mm, then to whatever else 
         match self.unit:
@@ -129,8 +139,10 @@ class Measurement:
 
         return self.from_value(value, unit)
 
-    def px(self, ppi: int = DEFAULT_PPI) -> Self:
-        return round(self.to(MeasureUnits.PX, ppi))
+    # Converts to pixels, return .value is `int`
+    def px(self, ppi: int = DEFAULT_PPI) -> PixelMeasurement:
+        to_px = self.to(MeasureUnits.PX, ppi)
+        return PixelMeasurement.from_value(to_px.value, MeasureUnits.PX, ppi)
 
     @override
     def __str__(self) -> str:
@@ -169,11 +181,18 @@ class Measurement:
     def __rmul__(self, other: object) -> Self:
         return self.__mul__(other)
 
-    def __truediv__(self, other: object) -> Self | float:
+    def __truediv__(self, other: object) -> Self | float :
         if isinstance(other, Measurement):
             return self.value / other.to(self.unit).value
         if isinstance(other, (int, float)):
             return self.from_value(self.value / other, self.unit)
+        return NotImplemented
+
+    def __floordiv__(self, other: object) -> Self | float | int:
+        if isinstance(other, Measurement):
+            return self.value // other.to(self.unit).value
+        if isinstance(other, (int, float)):
+            return self.from_value(self.value // other, self.unit)
         return NotImplemented
 
     #============================
@@ -222,7 +241,30 @@ class Measurement:
     def __round__(self, ndigits: int | None = None) -> Self:
         return self.from_value(round(self.value, ndigits), self.unit)
 
-    
+@dataclass(frozen=True)
+class PixelMeasurement(Measurement):
+    value: int = 0
+    unit: MeasureUnits = MeasureUnits.PX
+    ppi: int = DEFAULT_PPI
+
+    def __post_init__(self):
+        if self.unit != MeasureUnits.PX:
+            raise ValueError("PixelMeasurement must use pixels.")
+
+    @override
+    @classmethod
+    def from_value(cls, value: float, unit: MeasureUnits | str, ppi: int = DEFAULT_PPI) -> Self:
+        unit = cls._coerce_unit(unit)
+
+        if unit != MeasureUnits.PX:
+            raise ValueError("PixelMeasurement must use PX units.")
+
+        return cls(round(value), MeasureUnits.PX, ppi)
+
+    @override
+    def to(self, unit: MeasureUnits | str, ppi: int | None = None) -> Measurement:
+        return super().to(unit, ppi or self.ppi)
+
 # [!] Not sure if this is useful. Might delete later.
 def percent_of(part: str | Measurement, total: str | Measurement) -> Measurement:
     part = part if isinstance(part, Measurement) else Measurement.parse(part)

@@ -9,13 +9,14 @@
 # [X] assess external dependencies
 # [ ] compact code
 # ================================================
+from dataclasses import dataclass
 import math
 from typing import NamedTuple 
 
 from PIL import Image, ImageDraw
 from enum import Enum
 
-from src.measurements import Measurement
+from src.measurements import Measurement, PixelMeasurement
 from src.enums import Orientation, Registration
 
 # [!] Enum? Dataclass?
@@ -32,12 +33,33 @@ REG_PADDING_MM = 1.5  # Extra clearance around registration marks
 BORDERLESS_INSET_MM = 10
 BORDERLESS_EXPANSION_MM = (MIN_REG_INSET_MM - BORDERLESS_INSET_MM) * 2
 
+class PixelSize(NamedTuple):
+    width: PixelMeasurement
+    height: PixelMeasurement
+
+# [!] Not currently used
+@dataclass(frozen=True)
+class Point:
+    x: Measurement
+    y: Measurement
+
+    @property
+    def values(self) -> tuple[float, float]:
+        return (self.x.value, self.y.value)
+
+@dataclass(frozen=True)
+class PixelPoint:
+    x: PixelMeasurement
+    y: PixelMeasurement
+
+    @property
+    def values(self) -> tuple[int, int]:
+        return (self.x.value, self.y.value)
+
 # [!] Might need renaming to avoid confusion with Layout_Models
 class PageLayout(NamedTuple):
-    card_width_px: int
-    card_height_px: int
-    paper_width_px: int
-    paper_height_px: int
+    card_size: tuple[PixelMeasurement, PixelMeasurement]
+    paper_size: tuple[PixelMeasurement, PixelMeasurement]
     x_pos: list[int]
     y_pos: list[int]
     max_length_mm: float 
@@ -50,23 +72,22 @@ class CornerMatrix(Enum):
 
 def draw_reg_corner_lines(
     draw: ImageDraw.ImageDraw,
-    x: int,
-    y: int,
-    length: int,
-    thickness: int,
+    x: PixelMeasurement,
+    y: PixelMeasurement,
+    length: PixelMeasurement,
+    thickness: PixelMeasurement,
     x_dir: int,
     y_dir: int,
 ) -> None:
-    outer = length
     points = [
-        (x, y),
-        (x - x_dir * outer, y),
-        (x - x_dir * outer, y + y_dir * thickness),
-        (x - x_dir * thickness, y + y_dir * thickness),
-        (x - x_dir * thickness, y + y_dir * outer),
-        (x, y + y_dir * outer),
+        PixelPoint(x, y).values,
+        PixelPoint(x - x_dir * length, y).values,
+        PixelPoint(x - x_dir * length, y + y_dir * thickness).values,
+        PixelPoint(x - x_dir * thickness, y + y_dir * thickness).values,
+        PixelPoint(x - x_dir * thickness, y + y_dir * length).values,
+        PixelPoint(x, y + y_dir * length).values,
     ]
-
+    print(f"Drawing registration polygon: {points}")
     draw.polygon(points, fill="black")
 
 def generate_reg_mark(
@@ -83,25 +104,26 @@ def generate_reg_mark(
     # [!] Pillow measures in px, MPL in mm.
     print("Generating Registration Marks")
 
-    paper_width_px = paper_width.px(dpi)
-    paper_height_px = paper_height.px(dpi)
-    inset_px = inset.px(dpi)
-    thickness_px = thickness.px(dpi)
-    length_px = length.px(dpi)
+    # Normalize units to pixel
+    paper_width = paper_width.px(dpi)
+    paper_height = paper_height.px(dpi)
+    inset = inset.px(dpi)
+    thickness = thickness.px(dpi)
+    length = length.px(dpi)
 
-    min_reg_length_px = Measurement.from_value(MIN_REG_LENGTH_MM, "mm").px(dpi)
-    max_reg_length_px = Measurement.from_value(MAX_REG_LENGTH_MM, "mm").px(dpi)
-    min_reg_thickness_px = Measurement.from_value(MIN_REG_THICKNESS_MM, "mm").px(dpi)
-    max_reg_thickness_px = Measurement.from_value(MAX_REG_THICKNESS_MM, "mm").px(dpi)
-    max_reg_inset_px = Measurement.from_value(MAX_REG_INSET_MM, "mm").px(dpi)
+    min_reg_length = Measurement.from_value(MIN_REG_LENGTH_MM, "mm").px(dpi)
+    max_reg_length = Measurement.from_value(MAX_REG_LENGTH_MM, "mm").px(dpi)
+    min_reg_thickness = Measurement.from_value(MIN_REG_THICKNESS_MM, "mm").px(dpi)
+    max_reg_thickness = Measurement.from_value(MAX_REG_THICKNESS_MM, "mm").px(dpi)
+    max_reg_inset = Measurement.from_value(MAX_REG_INSET_MM, "mm").px(dpi)
 
     # Constrain registration mark parameters within valid ranges.
-    length_px = max(min_reg_length_px, min(length_px, max_reg_length_px))
-    thickness_px = max(min_reg_thickness_px, min(thickness_px, max_reg_thickness_px))
-    inset_px = min(inset_px, max_reg_inset_px)
+    length = max(min_reg_length, min(length, max_reg_length))
+    thickness = max(min_reg_thickness, min(thickness, max_reg_thickness))
+    inset = min(inset, max_reg_inset)
 
     # Create image sized to the paper dimensions
-    img = Image.new("RGB", (paper_width_px, paper_height_px), "white")
+    img = Image.new("RGB", (int(paper_width.value), int(paper_height.value)), "white")
     draw = ImageDraw.Draw(img)
 
     # Corners to draw L's on.
@@ -109,13 +131,16 @@ def generate_reg_mark(
 
     if registration == Registration.THREE:
         five = Measurement.parse("5mm").px(dpi)
-        coords = [ (inset_px, inset_px), (inset_px + five, inset_px + five) ]
+        coords = [ 
+            PixelPoint(inset, inset).values, 
+            PixelPoint(inset + five, inset + five).values 
+        ]
         print(f"Reg.THREE detected. Drawing rectangle at {coords}")
         draw.rectangle(
             coords,
             fill="black",
             outline=None,
-            width=thickness_px,
+            width=thickness.value,
         )
 
     else:  # Registration.FOUR
@@ -125,15 +150,15 @@ def generate_reg_mark(
     for corner in render_corners:
         print(f"Drawing corner: {corner.value}")
         x_dir, y_dir = corner.value
-        x = inset_px if x_dir < 0 else paper_width_px - inset_px
-        y = inset_px if y_dir > 0 else paper_height_px - inset_px
+        x = inset if x_dir < 0 else paper_width - inset
+        y = inset if y_dir > 0 else paper_height - inset
 
         draw_reg_corner_lines(
             draw,
             x=x,
             y=y,
-            length=length_px,
-            thickness=thickness_px,
+            length=length,
+            thickness=thickness,
             x_dir=x_dir,
             y_dir=y_dir,
         )
@@ -185,16 +210,15 @@ Definitions:
 
 def normalize_page_size(
     orientation: Orientation,
-    paper_width_px: int,
-    paper_height_px: int,
-) -> tuple[int, int]:
+    paper_size: tuple[PixelMeasurement, PixelMeasurement],
+) -> tuple[PixelMeasurement, PixelMeasurement]:
     """
     layouts.json stores paper sizes as landscape (width > height).
     Portrait swaps width and height; card dimensions are never swapped.
     """
     if orientation == Orientation.PORTRAIT:
-        return paper_height_px, paper_width_px
-    return paper_width_px, paper_height_px
+        return paper_size[1], paper_size[0]
+    return paper_size
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -203,9 +227,9 @@ def normalize_page_size(
 
 
 def compute_grid_fit(
-    usable: int,
-    card: int,
-    bleed: int,
+    usable: PixelMeasurement,
+    card: PixelMeasurement,
+    bleed: PixelMeasurement,
 ) -> int:
     """
     Compute how many cards fit along a single dimension.
@@ -226,20 +250,19 @@ def compute_grid_fit(
     return max(0, math.floor((usable + bleed) / (card + bleed)))
 
 
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 3. Select margins that avoid corner exclusion zones
 # ─────────────────────────────────────────────────────────────────────────────
 
 
 def select_best_margins(
-    page_width: int,
-    page_height: int,
-    card_width: int,
-    card_height: int,
-    bleed: int,
-    inset: int,
-    corner_len: int,
-) -> tuple[int, int, int, int, int, int]:
+    page_size: tuple[PixelMeasurement, PixelMeasurement],
+    card_size: tuple[PixelMeasurement, PixelMeasurement],
+    bleed: PixelMeasurement,
+    inset: PixelMeasurement,
+    corner_len: PixelMeasurement,
+) -> tuple[int, int, tuple[PixelMeVasurement, PixelMeasurement],tuple[PixelMeasurement, PixelMeasurement]]:
     """
     Try margin strategies and select the one that:
     - keeps the ENTIRE grid (cards + bleed) out of corner zones
@@ -275,25 +298,23 @@ def select_best_margins(
     def record_if_valid(
         cols: int,
         rows: int,
-        margin_x: int,
-        margin_y: int,
-        usable_width: int,
-        usable_height: int,
+        margins: tuple[PixelMeasurement, PixelMeasurement], 
+        usable_size: tuple[PixelMeasurement, PixelMeasurement],
     ) -> None:
 
         nonlocal best, best_count
         if cols <= 0 or rows <= 0:
             return
-        grid_width = cols * card_width + (cols + 1) * bleed
-        grid_height = rows * card_height + (rows + 1) * bleed
-        gap_x = margin_x + (usable_width - grid_width) / 2 - inset
-        gap_y = margin_y + (usable_height - grid_height) / 2 - inset
+        grid_width = cols * card_size[0] + (cols + 1) * bleed
+        grid_height = rows * card_size[1] + (rows + 1) * bleed
+        gap_x = margins[0] + (usable_size[0] - grid_width) / 2 - inset
+        gap_y = margins[1] + (usable_size[1] - grid_height) / 2 - inset
         if gap_x < corner_len and gap_y < corner_len:
             return
         count = cols * rows
         if count > best_count:
             best_count = count
-            best = (cols, rows, margin_x, margin_y, usable_width, usable_height)
+            best = (cols, rows, margins, usable_size)
 
     for margin_x, margin_y in strategies:
         usable_width = page_width - 2 * margin_x
@@ -377,13 +398,10 @@ def compute_card_positions(
 
 def generate_layout(
     orientation: Orientation,
-    card_width: Measurement,
-    card_height: Measurement,
-    paper_width: Measurement,
-    paper_height: Measurement,
-    inset: Measurement,
-    length: Measurement,
-    ppi: int,
+    card_size: tuple[PixelMeasurement, PixelMeasurement],
+    paper_size: tuple[PixelMeasurement, PixelMeasurement],
+    inset: PixelMeasurement,
+    length: PixelMeasurement,
 ):
     """
     Compute card positions on a page, accounting for margins, bleed,
@@ -397,28 +415,19 @@ def generate_layout(
     CARD_DISTANCE = "1.25mm"
 
     # Convert all dimensions to pixels
-    page_width_px = paper_width.px(ppi)
-    page_height_px = paper_height.px(ppi)
-    card_width_px = card_width.px(ppi)
-    card_height_px = card_height.px(ppi)
-    card_distance_px = Measurement.parse(CARD_DISTANCE).px(ppi)
-    inset_px = inset.px(ppi)
-    length_px = length.px(ppi)
+    ppi = paper_size[0].ppi
+    card_distance = Measurement.parse(CARD_DISTANCE).px(ppi)
 
     # Normalize orientation
-    page_width_px, page_height_px = normalize_page_size(
-        orientation, page_width_px, page_height_px
-    )
+    page_size = normalize_page_size(orientation, paper_size)
 
     # Select margins and grid size (strict — no fallback)
-    cols, rows, margin_x, margin_y, usable_w, usable_h = select_best_margins(
-        page_width_px,
-        page_height_px,
-        card_width_px,
-        card_height_px,
-        card_distance_px,
-        inset_px,
-        length_px,
+    cols, rows, margins, usable_area = select_best_margins(
+        page_size,
+        card_size,
+        card_distance,
+        inset,
+        length,
     )
 
     # Compute card positions
@@ -441,13 +450,13 @@ def generate_layout(
     max_length_mm = round(max_length_px * 25.4 / ppi, 2)
 
     return PageLayout(
-        card_width = card_width_px,
-        card_height = card_height_px,
-        paper_width = page_width_px,
-        paper_height = page_height_px,
+        card_width = card_width,
+        card_height = card_height,
+        paper_width = page_width,
+        paper_height = page_height,
         x_pos = x_pos,
         y_pos = y_pos,
-        max_length = max_length_mm,
+        max_length = max_length,
     )
 
     
