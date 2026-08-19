@@ -2,40 +2,27 @@
 # src/layouts/models.py
 #  Houses pydantic model classes which allow for easy ports from JSON. 
 #
-#  Supports several different levels of robustness and redundancy: 
-#    Ex: layouts.paper_layouts["letter"]["standard"]["borderless"]    
-#    Ex: layouts.paper_layouts.paper["letter"].card["standard"].variant["borderless"]
+#  Supports several different access routes: 
+#    dict: layouts.paper_layouts["letter"]["standard"]["borderless"]    
+#    item: layouts.paper_layouts.papers["letter"].cards["standard"].variants["borderless"]
+#    root: layouts.paper_layouts.root["letter"].root["standard"].root["borderless"]
 #==================================================================================================
 
-from typing import Annotated, Self, Generic, TypeVar
+from typing import Self, Generic, TypeVar
+from pydantic import BaseModel, RootModel, model_validator
 
-from pydantic import BaseModel, BeforeValidator, RootModel, model_validator
-
-from src.measurements import Measurement
 from src.enums import Orientation
 
 T = TypeVar("T", bound=BaseModel)
-#============================
-# Type Validator
-#============================
-def validate_measurement(value: Measurement | str) -> Measurement:
-    if isinstance(value, Measurement):
-        return value
-    return Measurement.parse(value)
-
-MeasurementField = Annotated[
-    Measurement,
-    BeforeValidator(validate_measurement)
-]
 
 #============================
 # Settings
 #============================
 # [!] Asserting that this must exist. 
 class RegistrationSettings(BaseModel):
-    inset: Measurement
-    thickness: Measurement
-    length: Measurement
+    inset: str 
+    thickness: str
+    length: str
 
 class VariantRegistrationSettings(BaseModel):
     default: RegistrationSettings
@@ -51,19 +38,19 @@ class DefaultSettings(BaseModel):
 #============================
 
 class CardSizeDef(BaseModel):
-    width: Measurement
-    height: Measurement
-    radius: Measurement | None = None
+    width: str
+    height: str
+    radius: str | None = None
     aliases: list[str] | None = []
 
 class PaperSizeDef(BaseModel):
-    width: Measurement
-    height: Measurement
+    width: str
+    height: str
     aliases: list[str] | None = []
 
     @model_validator(mode="after")
     def validate_orientation(self) -> Self:
-        if self.width.value < self.height.value:
+        if self.width < self.height:
             # [!] Why not just swap them?
             raise ValueError(
                 f"Paper width ({self.width}) must be >= height ({self.height})." 
@@ -85,14 +72,14 @@ class CardLayoutDef(BaseModel):
 
 class SpecialtyCardSizeDef(BaseModel):
     name: str | None = None
-    width: Measurement | None = None
-    height: Measurement | None = None
-    radius: Measurement | None = None     
+    width: str | None = None
+    height: str | None = None
+    radius: str | None = None     
 
 class SpecialtyPaperSizeDef(BaseModel):
     name: str | None = None
-    width: Measurement | None = None
-    height: Measurement | None = None
+    width: str | None = None
+    height: str | None = None
 
 class SpecialtyLayoutDef(BaseModel):
     card_size: SpecialtyCardSizeDef
@@ -107,6 +94,8 @@ class SpecialtyLayoutDef(BaseModel):
 #============================
 # Collection Classes
 #============================
+# These could all be identical and access elements via `defs.root[item]`
+# but the specificity is nice for autocomplete. 
 
 class Defs(RootModel[dict[str, T]], Generic[T]):
     def names(self) -> list[str]:
@@ -117,42 +106,38 @@ class Defs(RootModel[dict[str, T]], Generic[T]):
         self.root[name] = value 
 
 class CardLayoutDefs(Defs[CardLayoutDef]):
+    @property
     def variants(self) -> dict[str, CardLayoutDef]:
         return self.root
-    def variant(self, name: str) -> CardLayoutDef:
-        return self.root[name]
 
 class PaperLayoutDef(Defs[CardLayoutDefs]):
+    @property
     def cards(self) -> dict[str, CardLayoutDefs]:
         return self.root
-    def card(self, name: str) -> CardLayoutDefs:
-        return self.root[name]
 
 class PaperLayoutDefs(Defs[PaperLayoutDef]):
+    @property
     def papers(self) -> dict[str, PaperLayoutDef]:
         return self.root
-    def paper(self, name: str) -> PaperLayoutDef:
-        return self.root[name]
 
 class CardSizeDefs(Defs[CardSizeDef]):
+    @property
     def cards(self) -> dict[str, CardSizeDef]:
         return self.root
-    def card(self, name: str) -> CardSizeDef:
-        return self.root[name]
 
 class PaperSizeDefs(Defs[PaperSizeDef]):
+    @property
     def papers(self) -> dict[str, PaperSizeDef]:
         return self.root
-    def paper(self, name: str) -> PaperSizeDef:
-        return self.root[name]
 
 class SpecialtyLayoutDefs(Defs[SpecialtyLayoutDef]):
+    @property
     def layouts(self) -> dict[str, SpecialtyLayoutDef]:
         return self.root
     def layout(self, name: str) -> SpecialtyLayoutDef:
         return self.root[name]
 
-class LayoutDefs(BaseModel):
+class LayoutConfig(BaseModel):
     card_sizes: CardSizeDefs
     paper_sizes: PaperSizeDefs
     paper_layouts: PaperLayoutDefs
@@ -164,7 +149,7 @@ class LayoutDefs(BaseModel):
 #============================
 # Output
 #============================
-class LayoutDef(BaseModel):
+class ResolvedLayout(BaseModel):
     card_size: CardSizeDef
     paper_size: PaperSizeDef
     orientation: Orientation | None
@@ -173,3 +158,4 @@ class LayoutDef(BaseModel):
     num_rows: int | None
     num_cols: int | None 
     registration: RegistrationSettings | None
+    template: str | None

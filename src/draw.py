@@ -8,18 +8,23 @@ import math
 from PIL import Image, ImageDraw
 from enum import Enum
 
-from src.measurements import Measurement
+from src.cards import Cards, ProcessedCardSide, ProcessedCards
 from src.enums import FitMode, Orientation, CardSide
-from src.images import fill_rounded_corners, crop_and_scale_image
+from src.images import MINIMUM_BLEED, calculate_max_print_bleed, fill_rounded_corners, crop_and_scale_image
+from src.page_manager import PageLayout, RegistrationParams
 
+#============================
+# Options
+#============================
+# Measurement strings to be parsed
 
 @dataclass(frozen=True)
 class SideRenderOptions:
-    crop: Measurement | None
+    crop: str | None
     fit: FitMode
-    extend_edges: Measurement | None 
-    extend_corners_radius: Measurement | None
-    extend_bleed: Measurement | None
+    extend_edges: str | None 
+    extend_corners_radius: str | None
+    extend_bleed: str | None
 
 # [!] Might be able to freeze this? Looks like orientation is the holdup. 
 @dataclass(frozen=False) 
@@ -28,6 +33,104 @@ class CardRenderOptions:
     back: SideRenderOptions
     orientation: Orientation
     
+#============================
+# Params
+#============================
+# Numerical values to be used 
+
+@dataclass(frozen=True)
+class SideRenderParams:
+    crop: tuple[float, float]
+    fit: FitMode
+    extend_edges: int 
+    extend_corners_radius: int
+    extend_bleed: int
+
+# [!] Might be able to freeze this? Looks like orientation is the holdup. 
+@dataclass(frozen=False) 
+class CardRenderParams:
+    front: SideRenderParams
+    back: SideRenderParams
+    orientation: Orientation
+
+#============================
+# Geometry
+#============================
+
+# [!] Need to figure out the appropriate bleed to use here
+@dataclass(frozen=True)
+class RenderGeometry:
+    page_layout: PageLayout
+    max_print_bleed_width: int
+    max_print_bleed_height: int
+    radius: int
+    label_margin: int
+
+def build_render_geometry(
+    page_layout: PageLayout,
+    reg_params: RegistrationParams,
+    radius: int,
+    borderless: bool,
+) -> RenderGeometry:
+    if borderless:
+        label_margin_px = reg_params.inset
+    else:
+        label_margin_px = reg_params.inset - (2 * reg_params.thickness)
+
+    max_print_bleed = calculate_max_print_bleed(
+        page_layout.x_pos, page_layout.y_pos, 
+        page_layout.card_width_px, page_layout.card_height_px, 
+        MINIMUM_BLEED,
+    )
+
+
+
+    return RenderGeometry(
+        page_layout = page_layout,
+        max_print_bleed_width = max_print_bleed[0],
+        max_print_bleed_height = max_print_bleed[1],
+        radius = radius,
+        label_margin = label_margin_px,
+    )
+
+#============================
+# Page
+#============================
+@dataclass(frozen=True)
+class DuplexPage:
+    front: Image.Image
+    back:  Image.Image
+
+def get_card_positions(
+    page_layout: PageLayout,
+    skip_indices: set[int],
+) -> list[tuple[int, int]]:
+    card_positions = (page_layout.y_pos, page_layout.x_pos)
+    return [
+        (row, col)
+        for i, (row, col) in enumerate(card_positions)
+        if i not in skip_indices
+    ]
+
+
+def render_duplex_page(
+    bg_image: Image.Image,
+    processed_cards: ProcessedCards,
+    page_layout: PageLayout,
+    skip_indices_set: set[int]
+) -> DuplexPage:
+
+    x_pos = page_layout.x_pos
+    y_pos = page_layout.y_pos
+
+    front_pos = 
+
+    
+
+#============================
+# Render
+#============================
+
 def draw_card_with_bleed(
     card_image: Image.Image,
     base_image: Image.Image,
@@ -102,23 +205,23 @@ def draw_card_layout(
     width: int,
     height: int,
     print_bleed: tuple[int, int],
-    render_opts: CardRenderOptions,
+    render_params: CardRenderParams,
     ppi_ratio: float,
     side: CardSide,
     orientation: Orientation,
 ) -> None:
     num_cards = num_rows * num_cols
-    front_opts = render_opts.front
-    back_opts = render_opts.back 
-    crop_percent_x, crop_percent_y = front_opts.crop
-    crop_backs_percent_x, crop_backs_percent_y = back_opts.crop
+    front_params = render_params.front
+    back_params = render_params.back 
+    crop_percent_x, crop_percent_y = front_params.crop
+    crop_backs_percent_x, crop_backs_percent_y = back_params.crop
     print_bleed_x, print_bleed_y = print_bleed
 
-    extend_edges_thickness = math.floor(front_opts.extend_edges * ppi_ratio)
-    extend_edges_backs_thickness = math.floor(back_opts.extend_edges * ppi_ratio)
-    extend_corners_thickness = math.floor(front_opts.extend_corners_radius * ppi_ratio)
-    extend_corners_backs_thickness = math.floor(back_opts.extend_corners_radius * ppi_ratio)
-    extend_bleed_thickness = math.floor(front_opts.extend_bleed * ppi_ratio)
+    extend_edges_thickness = math.floor(front_params.extend_edges * ppi_ratio)
+    extend_edges_backs_thickness = math.floor(back_params.extend_edges * ppi_ratio)
+    extend_corners_thickness = math.floor(front_params.extend_corners_radius * ppi_ratio)
+    extend_corners_backs_thickness = math.floor(back_params.extend_corners_radius * ppi_ratio)
+    extend_bleed_thickness = math.floor(front_params.extend_bleed * ppi_ratio)
 
     scaled_width = math.floor(width * ppi_ratio)
     scaled_height = math.floor(height * ppi_ratio)
@@ -182,7 +285,7 @@ def draw_card_layout(
                     active_extend_edges_thickness,
                     active_extend_edges_thickness,
                     card_image.width - active_extend_edges_thickness,
-                    card_image.height - active_extend_edges_thickness,
+                   card_image.height - active_extend_edges_thickness,
                 )
             )
 
@@ -221,19 +324,15 @@ def draw_card_layout(
 
 # Doesn't save any lines of code but cleans up the call
 def draw_card_layouts(
-    front_card_images: list[Image.Image | None],
-    back_card_images: list[Image.Image | None],
-    single_back_image: Image.Image | None,
-    base_front_image: Image.Image,
-    base_back_image: Image.Image,
-    num_rows: int,
-    num_cols: int,
+    cards: Cards,
+    page: DuplexPage,
+
     x_pos: list[int],
     y_pos: list[int],
     width: int,
     height: int,
     print_bleed: tuple[int, int],
-    render_opts: CardRenderOptions,
+    render_params: CardRenderParams,
     ppi_ratio: float,
     orientation: Orientation,
 ) -> None:
@@ -248,7 +347,7 @@ def draw_card_layouts(
         width,
         height,
         print_bleed,
-        render_opts,
+        render_params,
         ppi_ratio,
         side=CardSide.FRONT,
         orientation=orientation,
@@ -265,7 +364,7 @@ def draw_card_layouts(
         width,
         height,
         print_bleed,
-        render_opts,
+        render_params,
         ppi_ratio,
         side=CardSide.BACK,
         orientation=orientation,

@@ -17,3 +17,9 @@ This is a full refactor of the `create_pdf` side of the codebase. It will not to
 - Config system
 - Layout overhaul
 - Additional tooling and organized `tools/` 
+
+## Future Features:
+
+- feature/user-config
+- feature/hierarchical-card-backs
+- feature/layout-preview

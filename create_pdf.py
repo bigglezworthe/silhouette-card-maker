@@ -2,16 +2,19 @@ import click
 
 from pathlib import Path
 
-from src.click import MeasureType
+from src.cards import find_cards
 from src.draw import CardRenderOptions, SideRenderOptions
 from src.enums import Orientation, Registration, FitMode 
-from src.measurements import DEFAULT_PPI, Measurement
-from src.paths import ImagePaths, Paths
+from src.measurements import DEFAULT_PPI 
+from src.paths import ImagePaths, Paths, load_image_paths, prepare_output_path
 from src.pdf import generate_pdf
 from src.layouts import (
     get_all_card_size_names,
     get_all_paper_size_names,
     get_all_specialty_layout_names,
+    load_defaults,
+    load_layouts,
+    prepare_layout,
 )
 
 #============================
@@ -41,14 +44,14 @@ SPECIALTY_CHOICES = get_all_specialty_layout_names()
 @click.option("--only_fronts", default=False, is_flag=True, help="Only generate front pages.")
 @click.option("--fit", default=FitMode.STRETCH.value, type=click.Choice([t.value for t in FitMode], case_sensitive=False), show_default=True, help="How to fit front and double-sided images to card size. 'stretch' allows distortion, 'crop' preserves aspect ratio by center-cropping.")
 @click.option("--fit_backs", type=click.Choice([t.value for t in FitMode], case_sensitive=False), help="How to fit back images to card size. 'stretch' allows distortion, 'crop' preserves aspect ratio by center-cropping.")
-@click.option("--crop", type=MeasureType(default_unit="%"), help="Crop card edges of front and double-sided images (removes edges). Examples: 3mm, 0.125in, 6.5.")
-@click.option("--crop_backs", type=MeasureType(default_unit="%"), help="Crop card edges of back images (removes edges). Examples: 3mm, 0.125in, 6.5.")
-@click.option("--extend_edges", type=MeasureType(invalid_units=("%")), help="Crop card edges and extend them for front and double-sided images. Examples: 3mm, 0.125in.")
-@click.option("--extend_edges_backs", type=MeasureType(invalid_units=("%")), help="Crop card edges and extend them for back images only. Examples: 3mm, 0.125in.")
-@click.option("--extend_corners", type=MeasureType(invalid_units=("%")), help="Extend rounded corner regions to reduce corner artifacts for front and double-sided images. Examples: 3mm, 0.125in.")
-@click.option("--extend_corners_backs", type=MeasureType(invalid_units=("%")), help="Extend rounded corner regions to reduce corner artifacts for back images only. Examples: 3mm, 0.125in.")
-@click.option("--extend_bleed", type=MeasureType(invalid_units=("%")), help="Extend the outer bleed of outer cards on front pages (odd-numbered pages). Examples: 3mm, 0.125in.")
-@click.option("--extend_bleed_backs", type=MeasureType(invalid_units=("%")), help="Extend the outer bleed of outer cards on back pages (even-numbered pages). Examples: 3mm, 0.125in.")
+@click.option("--crop", help="Crop card edges of front and double-sided images (removes edges). Examples: 3mm, 0.125in, 6.5.")
+@click.option("--crop_backs", help="Crop card edges of back images (removes edges). Examples: 3mm, 0.125in, 6.5.")
+@click.option("--extend_edges", help="Crop card edges and extend them for front and double-sided images. Examples: 3mm, 0.125in.")
+@click.option("--extend_edges_backs", help="Crop card edges and extend them for back images only. Examples: 3mm, 0.125in.")
+@click.option("--extend_corners", help="Extend rounded corner regions to reduce corner artifacts for front and double-sided images. Examples: 3mm, 0.125in.")
+@click.option("--extend_corners_backs", help="Extend rounded corner regions to reduce corner artifacts for back images only. Examples: 3mm, 0.125in.")
+@click.option("--extend_bleed", help="Extend the outer bleed of outer cards on front pages (odd-numbered pages). Examples: 3mm, 0.125in.")
+@click.option("--extend_bleed_backs", help="Extend the outer bleed of outer cards on back pages (even-numbered pages). Examples: 3mm, 0.125in.")
 @click.option("--ppi", default=DEFAULT_PPI, type=click.IntRange(min=0), show_default=True, help="Pixels per inch (PPI) when creating PDF.")
 @click.option("--quality", default=100, type=click.IntRange(min=0, max=100), show_default=True, help="File compression quality.")
 @click.option("--load_offset", default=False, is_flag=True, help="Apply saved offsets. See `offset_pdf.py` for more information.")
@@ -73,14 +76,14 @@ def cli(
     only_fronts: bool,
     fit: FitMode,
     fit_backs: FitMode,
-    crop: Measurement | None,
-    crop_backs: Measurement | None,
-    extend_edges: Measurement | None,
-    extend_edges_backs: Measurement | None,
-    extend_corners: Measurement | None,
-    extend_corners_backs: Measurement | None,
-    extend_bleed: Measurement | None,
-    extend_bleed_backs: Measurement | None,
+    crop: str | None,
+    crop_backs: str | None,
+    extend_edges: str | None,
+    extend_edges_backs: str | None,
+    extend_corners: str | None,
+    extend_corners_backs: str | None,
+    extend_bleed: str | None,
+    extend_bleed_backs: str | None,
     ppi: int,
     quality: int,
     skip: list[int],
@@ -90,19 +93,32 @@ def cli(
     borderless: bool,
 ) -> None:
 
-    #========================
-    # Input Validation
-    #========================
-
     image_paths = ImagePaths(
-        front = front_dir_path,
-        back = back_dir_path,
-        double = double_sided_dir_path,
-        output = output_path
+        front_dir_path.resolve(), 
+        back_dir_path.resolve(), 
+        double_sided_dir_path.resolve(),
     )
+    output_path = prepare_output_path(output_path, output_images)
+
+    cards = find_cards(image_paths, only_fronts)
+    
+    ppi_scale = ppi / DEFAULT_PPI
 
     # [!] Need to track down what ACTUALLY happens when None is supplied
     registration_orientation = registration_orientation or Orientation.LANDSCAPE
+
+    #========================
+    # Layout
+    #========================
+    layout_defs = load_layouts()
+    layout_def = prepare_layout(
+        layout_defs = layout_defs,
+        card_size_name = card_size,
+        paper_size_name = paper_size,
+        borderless = borderless,
+        specialty_name = specialty,
+        registration_orientation_override = registration_orientation,
+    )
 
     #========================
     # Structure Init
@@ -128,21 +144,22 @@ def cli(
     
     generate_pdf(
         image_paths = image_paths,
+        cards = cards,
+        layout_def = layout_def,
+        output_path = output_path,
         output_images = output_images,
-        card_name = card_size,
-        paper_name = paper_size,
+        card_size_name = card_size,
+        paper_size_name = paper_size,
         registration = registration,
         only_fronts = only_fronts,
         render_opts = render_opts,
-        ppi = ppi,
+        ppi_scale = ppi_scale,
         quality = quality,
         skip_indices = skip,
         load_offset = load_offset,
         label = label,
         show_outline = show_outline,
-        specialty_name = specialty,
         borderless = borderless,
-        registration_orientation_override = registration_orientation,
     )
 
 

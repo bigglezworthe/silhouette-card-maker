@@ -2,16 +2,27 @@
 # images.py
 #     Place images on the page and perform non-crop manipulations
 # ==============================================================================
+from dataclasses import dataclass
 import math
 
-from pathlib import Path
-from PIL import Image, ImageOps
+from PIL import Image
 
-from src import measurements
+from src.calcs import crop_and_scale_image
+from src.cards import Card, CardSide, ProcessedCard, ProcessedCardSide
+from src.draw import CardRenderParams, RenderGeometry, SideRenderParams
 from src.enums import FitMode
+from src.measurements import parse_measurement
 
 # Approximately 1.25mm of bleed in px assuming 300ppi: ceil(1.25mm * 1in/25.4mm * 300px/1in)
 MINIMUM_BLEED = 15
+
+@dataclass(frozen=True)
+class CardRenderGeometry:
+    width: int
+    height: int
+    print_bleed_x: int
+    print_bleed_y: int
+    ppi_scale: float
 
 
 def calculate_max_print_bleed(
@@ -74,22 +85,6 @@ def fill_rounded_corners(card_image: Image.Image, corner_radius: int) -> Image.I
                         pass
     return result
 
-
-def load_card_image(image_path: str | Path, path_label: str = "") -> Image.Image | None:
-
-    path_label = f"{path_label.strip()} " if len(path_label) else ""
-
-    try:
-        image = Image.open(image_path)
-        return ImageOps.exif_transpose(image)
-    except FileNotFoundError:
-        print(f'Cannot get {path_label} image "{image_path}".')
-    except OSError as e:
-        raise OSError(f'Failed to load {path_label} image "{image_path}": {e}') from e
-
-    return None
-
-
 def convert_inch_to_crop(
     crop_in: float, card_width_px: int, card_height_px: int
 ) -> tuple[float, float]:
@@ -103,139 +98,85 @@ def convert_inch_to_crop(
     return (crop_x_percent, crop_y_percent)
 
 
-def parse_dimension_string(dimension_string: str | None, ppi: int) -> int:
-    if dimension_string is None:
-        return 0
-
-    valid_units = ["", "mm", "in", "px"]
-    amount, unit = measurements.parse_unit_string(dimension_string, valid_units)
-
-    if unit == "mm":
-        return math.floor(amount / 25.4 * ppi)
-    if unit == "in":
-        return math.floor(amount * ppi)
-    return int(amount)
-
-
-
-
-def parse_crop_string(
-    crop_string: str | None, card_width: int, card_height: int
-) -> tuple[float, float]:
+def parse_crop_string(crop_string: str | None) -> tuple[float, str]:
     if crop_string is None:
-        return 0, 0
+        return 0, ""
 
     valid_units = ["", "mm", "in", "%"]
     try: 
-        amount, unit = measurements.parse_unit_string(crop_string, valid_units)
+        return parse_measurement(crop_string, valid_units)
     except ValueError as e:
         raise ValueError(f"Invalid Crop Format: {crop_string}") from e
 
-    if unit == "mm":
-        return convert_inch_to_crop(amount / 25.4, card_width, card_height)
-    if unit == "in":
-        return convert_inch_to_crop(amount, card_width, card_height)
-    # Default unit is %
-    return amount, amount
+def process_card_side(
+    card_side: CardSide,
+    render_params: SideRenderParams,
+    geometry: RenderGeometry,
+) -> ProcessedCardSide:
+    image = card_side.image
+
+    if image is None:
+        raise ValueError("Card side must have an image to process. ")
+
+    crop_percent_x, crop_percent_y = render_params.crop
 
 
-# [!] X/Ys should be consolidated for args and return
-def crop_and_scale_image(
-    card_image: Image.Image,
-    crop_percent_x: float,
-    crop_percent_y: float,
-    scaled_width: int,
-    scaled_height: int,
-    scaled_bleed_width: int,
-    scaled_bleed_height: int,
-    fit: FitMode = FitMode.STRETCH,
-) -> tuple[Image.Image, int, int, tuple[int, int]]:
-    # Returns processed image, bleed_offset_x, bleed_offset_y, synthetic_bleed (w,h)
-
-    card_width, card_height = card_image.size
-
-    cropped_width = math.floor(card_width * (1 - (crop_percent_x / 100)))
-    cropped_height = math.floor(card_height * (1 - (crop_percent_y / 100)))
-
-    if fit == FitMode.CROP:
-        uniform_ratio = min(
-            cropped_width / scaled_width, cropped_height / scaled_height
+    if crop_percent_x > 0 or crop_percent_y > 0 or render_params.fit == FitMode.CROP:
+        crop_result = crop_and_scale_image(
+            image,
+            crop_percent_x,
+            crop_percent_y,
+            geometry.scaled_card_width,
+            geometry.scaled_card_height,
+            geometry.scaled_bleed_width,
+            geometry.scaled_bleed_height,
+            render_params.fit,
         )
-        cropped_scaled_ratio_x = uniform_ratio
-        cropped_scaled_ratio_y = uniform_ratio
+    
+        image = crop_result.image
+        offset_x, offset_y = crop_result.offset
+        synthetic_bleed_width, synthetic_bleed_height = crop_result.synthetic_bleed
+
     else:
-        cropped_scaled_ratio_x = cropped_width / scaled_width
-        cropped_scaled_ratio_y = cropped_height / scaled_height
+        image = image.resize((geometry.scaled_card_width, geometry.scaled_card_height))
+        offset_x = 0
+        offset_y = 0
+        synthetic_bleed_width = geometry.scaled_bleed_width
+        synthetic_bleed_height = geometry.scaled_bleed_height
 
-    scaled_width_with_bleed = scaled_width + (2 * scaled_bleed_width)
-    scaled_height_with_bleed = scaled_height + (2 * scaled_bleed_height)
+    extend_edges = render_params.extend_edges
+    if extend_edges > 0:
+        image = image.crop((
+            extend_edges, extend_edges, 
+            image.width - extend_edges, image.height - extend_edges
+        ))
 
-    unscaled_width_with_bleed = math.floor(
-        scaled_width_with_bleed * cropped_scaled_ratio_x
+    extend_corners = render_params.extend_corners_radius
+    if extend_corners > 0:
+        image = fill_rounded_corners(image, render_params.extend_corners_radius)
+
+    return ProcessedCardSide(
+        image = image,
+        offset_x = offset_x,
+        offset_y = offset_y,
+        synthetic_bleed_width = synthetic_bleed_width,
+        synthetic_bleed_height = synthetic_bleed_height, 
     )
-    unscaled_height_with_bleed = math.floor(
-        scaled_height_with_bleed * cropped_scaled_ratio_y
-    )
 
-    can_bleed_x = unscaled_width_with_bleed <= card_width
-    can_bleed_y = unscaled_height_with_bleed <= card_height
+def process_cards(
+    card_batch: list[Card],
+    default_back: ProcessedCardSide | None,
+    render_params: CardRenderParams,
+    render_geometry: RenderGeometry,
+) -> list[ProcessedCard]:
+    processed: list[ProcessedCard] = []
+    for card in card_batch:
+        front = process_card_side(card.front, render_params.front, render_geometry)
+        if card.back is None:
+            back = default_back
+        else: 
+            back = process_card_side(card.back, render_params.back, render_geometry)
+        processed.append(ProcessedCard(front, back))
 
-    # [!] Definitely some duplication happening here. Can set vars and perform ops after.
-    if can_bleed_x and can_bleed_y:
-        crop_x = (card_width - unscaled_width_with_bleed) // 2
-        crop_y = (card_height - unscaled_height_with_bleed) // 2
-        card_image = card_image.crop(
-            (crop_x, crop_y, card_width - crop_x, card_height - crop_y)
-        )
-        card_image = card_image.resize(
-            (scaled_width_with_bleed, scaled_height_with_bleed)
-        )
+    return processed
 
-        return card_image, -scaled_bleed_width, -scaled_bleed_height, (0, 0)
-
-    if fit == FitMode.CROP:
-        if can_bleed_x:
-            content_height = min(
-                math.floor(scaled_height * cropped_scaled_ratio_y), card_height
-            )
-            crop_x = (card_width - unscaled_width_with_bleed) // 2
-            crop_y = (card_height - content_height) // 2
-            card_image = card_image.crop(
-                (crop_x, crop_y, card_width - crop_x, card_height - crop_y)
-            )
-            card_image = card_image.resize((scaled_width_with_bleed, scaled_height))
-            return card_image, -scaled_bleed_width, 0, (0, scaled_bleed_height)
-        if can_bleed_y:
-            content_width = min(
-                math.floor(scaled_width * cropped_scaled_ratio_x), card_width
-            )
-            crop_x = (card_width - content_width) // 2
-            crop_y = (card_height - unscaled_height_with_bleed) // 2
-            card_image = card_image.crop(
-                (crop_x, crop_y, card_width - crop_x, card_height - crop_y)
-            )
-            card_image = card_image.resize((scaled_width, scaled_height_with_bleed))
-            return card_image, 0, -scaled_bleed_height, (scaled_bleed_width, 0)
-
-        content_width = min(
-            math.floor(scaled_width * cropped_scaled_ratio_x), card_width
-        )
-        content_height = min(
-            math.floor(scaled_height * cropped_scaled_ratio_y), card_height
-        )
-        crop_x = (card_width - content_width) // 2
-        crop_y = (card_height - content_height) // 2
-        card_image = card_image.crop(
-            (crop_x, crop_y, card_width - crop_x, card_height - crop_y)
-        )
-        card_image = card_image.resize((scaled_width, scaled_height))
-        return card_image, 0, 0, (scaled_bleed_width, scaled_bleed_height)
-
-    # STRETCH fallback
-    crop_x = card_width * (crop_percent_x / 100) // 2
-    crop_y = card_height * (crop_percent_y / 100) // 2
-    card_image = card_image.crop(
-        (crop_x, crop_y, card_width - crop_x, card_height - crop_y)
-    )
-    card_image = card_image.resize((scaled_width, scaled_height))
-    return card_image, 0, 0, (scaled_bleed_width, scaled_bleed_height)
