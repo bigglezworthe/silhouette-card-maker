@@ -8,6 +8,8 @@ import json
 import math
 
 from pydantic import BaseModel, ValidationError
+
+from src.defaults import DEFAULT_PPI
 from .paths import Paths
 
 from PIL import Image, ImageChops 
@@ -48,15 +50,15 @@ def offset_images(
     images: list[Image.Image],
     x_offset: int,
     y_offset: int,
-    ppi: int,
+    ppi_scale: float = 1.0,
     angle_offset: float = 0.0,
 ) -> list[Image.Image]:
     result_images: list[Image.Image] = []
      
     # Only add offset to back images and account for orientation flip 
     add_offset = False
-    x_back_offset = math.floor(-x_offset * ppi / 300)
-    y_back_offset = math.floor(y_offset * ppi / 300)
+    x_back_offset = math.floor(-x_offset * ppi_scale * DEFAULT_PPI)
+    y_back_offset = math.floor(y_offset * ppi_scale * DEFAULT_PPI)
 
     for image in images:
         if add_offset:

@@ -3,6 +3,7 @@
 #     Place images on the page and perform non-crop manipulations
 # ==============================================================================
 from dataclasses import dataclass
+from itertools import pairwise
 import math
 
 from PIL import Image
@@ -14,6 +15,7 @@ from src.enums import FitMode
 from src.measurements import parse_measurement
 
 # Approximately 1.25mm of bleed in px assuming 300ppi: ceil(1.25mm * 1in/25.4mm * 300px/1in)
+# [!] rename to DEFAULT_PRINT_BLEED
 MINIMUM_BLEED = 15
 
 @dataclass(frozen=True)
@@ -26,21 +28,26 @@ class CardRenderGeometry:
 
 
 def calculate_max_print_bleed(
-    x_pos: list[int],
-    y_pos: list[int],
+    positions: list[tuple[int,int]],
     width: int,
     height: int,
-    min_bleed: int = 0
+    fallback_bleed: int = MINIMUM_BLEED
 ) -> tuple[int, int]:
+    rows = sorted({row for row, _ in positions})
+    cols = sorted({col for _, col in positions})
 
     def max_bleed(positions: list[int], size: int) -> int:
         if len(positions) < 2:
-            return min_bleed
+            return fallback_bleed
 
-        positions = sorted(positions)
-        return max(0, math.ceil((positions[1] - positions[0] - size) / 2))
+        gaps = [
+            current - previous - size
+            for previous, current in pairwise(positions)
+        ]
 
-    return max_bleed(x_pos, width), max_bleed(y_pos, height)
+        return max(fallback_bleed, math.ceil(min(gaps) / 2))
+
+    return max_bleed(cols, width), max_bleed(rows, height)
 
 
 def fill_rounded_corners(card_image: Image.Image, corner_radius: int) -> Image.Image:
@@ -126,10 +133,10 @@ def process_card_side(
             image,
             crop_percent_x,
             crop_percent_y,
-            geometry.scaled_card_width,
-            geometry.scaled_card_height,
-            geometry.scaled_bleed_width,
-            geometry.scaled_bleed_height,
+            geometry.page_layout.card_width_px,
+            geometry.page_layout.card_height_px,
+            geometry.max_print_bleed_width,
+            geometry.max_print_bleed_height,
             render_params.fit,
         )
     
@@ -138,11 +145,11 @@ def process_card_side(
         synthetic_bleed_width, synthetic_bleed_height = crop_result.synthetic_bleed
 
     else:
-        image = image.resize((geometry.scaled_card_width, geometry.scaled_card_height))
+        image = image.resize((geometry.page_layout.card_width_px, geometry.page_layout.card_height_px))
         offset_x = 0
         offset_y = 0
-        synthetic_bleed_width = geometry.scaled_bleed_width
-        synthetic_bleed_height = geometry.scaled_bleed_height
+        synthetic_bleed_width = geometry.max_print_bleed_width
+        synthetic_bleed_height = geometry.max_print_bleed_height
 
     extend_edges = render_params.extend_edges
     if extend_edges > 0:

@@ -43,6 +43,7 @@ class PageLayout:
     paper_width_px: int
     paper_height_px: int
     card_positions: list[tuple[int, int]]
+    back_positions: list[tuple[int, int]]
     num_rows: int
     num_cols: int
     max_length_mm: float 
@@ -441,13 +442,20 @@ def build_card_positions(
         if index not in skips
     ]
 
-def flip_page_position(
-    positions: tuple[int,int],
-    rows: int,
-) -> tuple[int,int]:
-    row, col = positions
-    return (rows - 1 - row, col)
-
+def mirror_card_positions(
+    card_positions: list[tuple[int,int]],
+    rows: list[int],
+    cols: list[int],
+    mirror_rows: bool = True,
+    mirror_cols: bool = True,
+) -> list[tuple[int, int]]:
+    return[
+        (
+            min(rows) + max(rows) - row if mirror_rows else row, 
+            min(cols) + max(cols) - col if mirror_cols else col
+        ) 
+        for row, col in card_positions
+    ]
 
 def generate_layout(
     orientation: Orientation,
@@ -525,12 +533,19 @@ def generate_layout(
         skips = skip_indices_set,
     )
 
+    mirrored_positions = mirror_card_positions(
+        card_positions = valid_positions,
+        rows = y_pos,
+        cols = x_pos,
+    )
+
     return PageLayout(
         card_width_px = card_width_px,
         card_height_px = card_height_px,
         paper_width_px = page_width_px,
         paper_height_px = page_height_px,
         card_positions = valid_positions,
+        back_positions = mirrored_positions,
         num_rows = len(y_pos),
         num_cols = len(x_pos),
         max_length_mm = max_length_mm,
@@ -556,4 +571,4 @@ def resolve_skipped_indices(
         raise ValueError("You cannot skip all cards per page!")
 
     return valid_indices
-    
+ 
