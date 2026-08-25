@@ -6,17 +6,19 @@ import math
 
 from pathlib import Path
 
-from PIL import Image, ImageFont, ImageDraw
+from PIL import ImageFont
 
+from src.paths import Paths
 from src.calcs import calculate_reg_params, calculate_render_params
-from src.cards import Cards, batch_cards, load_card_side, load_cards
+from src.cards import batch_cards, load_card_side, load_cards
 from src.defaults import DEFAULT_PPI
 from src.draw import (
-    CardRenderOptions,
     DuplexPage,
     add_print_bleed,
+    build_label_text,
     build_render_geometry,
     draw_outlines,
+    normalize_pages,
     render_duplex_page,
 )
 from src.enums import Orientation, OrientationMode, Registration, Variant
@@ -33,19 +35,15 @@ from src.measurements import parse_to_mm, parse_to_px
 from src.offset import load_saved_offset
 from src.page_manager import (
     REG_PADDING_MM,
-    PageLayout,
     generate_layout,
     generate_reg_mark,
     resolve_reg_opts,
 )
 from src.paths import ImagePaths
+from src.render_models import CardRenderOptions, Cards, PageLayout
 
+LABEL_FONT = Paths.assets / "arial.ttf"
 
-def create_template_name(
-    paper_size: str, card_size: str, variant: Variant, version: int
-) -> str:
-    var_string = f"{variant.value}-" if variant != Variant.DEFAULT else ""
-    return f"{paper_size}-{card_size}-{var_string}v{version}"
 
 
 # [!] Might belong in layout.py?
@@ -155,20 +153,26 @@ def generate_pdf(
         layout_def.registration,
     )
 
+    reg_params = calculate_reg_params(reg_opts=reg_opts, ppi_scale=ppi_scale)
+
     card_size_def = layout_def.card_size
     paper_size_def = layout_def.paper_size
 
+    orientation = layout_def.orientation or DEFAULT_ORIENTATION
+
     # [!] skip_indices can be immediately validated as set
     page_layout = generate_layout(
-        orientation=layout_def.orientation or DEFAULT_ORIENTATION,
+        orientation=orientation,
         card_width=card_size_def.width,
         card_height=card_size_def.height,
         paper_width=paper_size_def.width,
         paper_height=paper_size_def.height,
         inset=reg_opts.inset,
+        thickness=reg_opts.thickness,
         length=total_exclusion,
         ppi_scale=ppi_scale,
         skip_indices=skip_indices,
+        borderless=borderless,
     )
 
     render_params = calculate_render_params(
@@ -177,27 +181,12 @@ def generate_pdf(
         ppi_scale=ppi_scale,
     )
 
-    reg_params = calculate_reg_params(reg_opts=reg_opts, ppi_scale=ppi_scale)
-
-    radius_px = parse_to_px(card_size_def.radius or defaults.card_radius, ppi_scale)
-
-    # ==============================
-    # PDF
-    # ==============================
 
     num_cards = len(page_layout.card_positions)
     if num_cards == 0:
         raise ValueError(
             f'Card size "{card_size_name}" does not fit on paper size "{paper_size_name}".'
-        )
-
-    # ==============================
-    # Skip Indices
-    # ==============================
-    if borderless:
-        label_margin_px = math.floor(reg_params.inset)
-    else:
-        label_margin_px = math.floor(reg_params.inset - reg_params.thickness * 2)
+        ) 
 
     # ==============================
     # Registration
@@ -215,6 +204,8 @@ def generate_pdf(
     # Page Manager
     # ==============================
     pages: list[DuplexPage] = []
+
+    radius_px = parse_to_px(card_size_def.radius or defaults.card_radius, ppi_scale)
 
     render_geometry = build_render_geometry(
         page_layout=page_layout,
@@ -234,7 +225,11 @@ def generate_pdf(
                 loaded_card_back, render_params.back, render_geometry
             )
 
-    for card_batch in batch_cards(cards.cards, len(page_layout.card_positions)):
+    print("registration:", reg_image.size)
+    for sheet_number, card_batch in enumerate(
+        batch_cards(cards.cards, len(page_layout.card_positions)), 
+        start=1,
+    ):
         loaded_cards = load_cards(card_batch)
         processed_cards = process_cards(
             loaded_cards,
@@ -243,11 +238,18 @@ def generate_pdf(
             render_geometry,
         )
 
+        front_sheet_num = sheet_number if only_fronts else sheet_number * 2 - 1
+        label_text = build_label_text(front_sheet_num, layout_def.template, label)
+
         duplex_page = render_duplex_page(
             bg_image=reg_image.copy(),
             processed_cards=processed_cards,
             page_layout=page_layout,
+            label_text=label_text,
+            label_font=ImageFont.truetype(LABEL_FONT, 40 * ppi_scale),
         )
+        if sheet_number == 1:
+            print("duplex_front_page:", duplex_page.front.size)
 
         processed_duplex_page = add_print_bleed(
             duplex_page,
@@ -255,27 +257,28 @@ def generate_pdf(
             render_geometry,
             render_params,
         )
+        if sheet_number == 1:
+            print("processed:", processed_duplex_page.front.size)
 
-        labeled_duplex_page = add_label(
-            duplex_page,
-            reg_params,
+        normalized_duplex_page = normalize_pages(processed_duplex_page, orientation)
+        if sheet_number == 1:
+            print("normalized:", normalized_duplex_page.front.size)
 
-            borderless, 
-        )
 
-        pages.append(processed_duplex_page)
-
-        if show_outline:
-            # [!] Consolidated calls
-            draw_outlines(
-                pages,
-                page_layout,
-                render_geometry.radius,
-            )
+        pages.append(normalized_duplex_page)
 
     if len(pages) == 0:
         print("No pages were generated.")
         return
+
+    if show_outline:
+        # [!] Consolidated calls
+        draw_outlines(
+            pages,
+            page_layout,
+            render_geometry.radius,
+        )
+    print("outline:", pages[0].front.size)
 
     if load_offset:
         saved_offset = load_saved_offset()
@@ -292,6 +295,7 @@ def generate_pdf(
 
     images = [image for page in pages for image in (page.front, page.back)]
 
+    print("output_res:", int(DEFAULT_PPI * ppi_scale))
     if output_images:
         for i, image in enumerate(images):
             image.save(
@@ -301,7 +305,6 @@ def generate_pdf(
                 subsampling=0,
                 quality=quality,
             )
-        print(f"Generated images: {output_path}")
     else:
         images[0].save(
             output_path,
@@ -313,4 +316,4 @@ def generate_pdf(
             subsampling=0,
             quality=quality,
         )
-        print(f"Generated PDF: {output_path}")
+    print(f"Generated PDF: {output_path}")

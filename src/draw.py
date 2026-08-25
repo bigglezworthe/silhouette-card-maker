@@ -6,63 +6,16 @@ from dataclasses import dataclass
 
 from PIL import Image, ImageDraw, ImageFont
 
-from src.cards import ProcessedCard, ProcessedCardSide
-from src.enums import FitMode, Orientation
+from src.enums import Orientation
 from src.images import MINIMUM_BLEED, calculate_max_print_bleed
-from src.page_manager import PageLayout, RegistrationParams
+from src.render_models import CardRenderParams, RenderGeometry, PageLayout, RegistrationParams, ProcessedCard, ProcessedCardSide
+
 
 #============================
 # Options
 #============================
 # Measurement strings to be parsed
 
-@dataclass(frozen=True)
-class SideRenderOptions:
-    crop: str | None
-    fit: FitMode
-    extend_edges: str | None 
-    extend_corners_radius: str | None
-    extend_bleed: str | None
-
-# [!] Might be able to freeze this? Looks like orientation is the holdup. 
-@dataclass(frozen=False) 
-class CardRenderOptions:
-    front: SideRenderOptions
-    back: SideRenderOptions
-    orientation: Orientation
-    
-#============================
-# Params
-#============================
-# Numerical values to be used 
-
-@dataclass(frozen=True)
-class SideRenderParams:
-    crop: tuple[float, float]
-    fit: FitMode
-    extend_edges: int 
-    extend_corners_radius: int
-    extend_bleed: int
-
-# [!] Might be able to freeze this? Looks like orientation is the holdup. 
-@dataclass(frozen=False) 
-class CardRenderParams:
-    front: SideRenderParams
-    back: SideRenderParams
-    orientation: Orientation
-
-#============================
-# Geometry
-#============================
-
-# [!] Need to figure out the appropriate bleed to use here
-@dataclass(frozen=True)
-class RenderGeometry:
-    page_layout: PageLayout
-    max_print_bleed_width: int
-    max_print_bleed_height: int
-    radius: int
-    label_margin: int
 
 def build_render_geometry(
     page_layout: PageLayout,
@@ -97,14 +50,45 @@ class DuplexPage:
     front: Image.Image
     back:  Image.Image
 
+
+def build_label_text(sheet_number: int, template: str | None, label: str | None) -> str:
+    text = f"sheet: {sheet_number}, template: {template or ""}"
+    if label:
+        text = f"label: {label}, {text}"
+    return text
+
+def normalize_pages(
+    duplex_page: DuplexPage,
+    orientation: Orientation,
+) -> DuplexPage:
+    if orientation != Orientation.PORTRAIT:
+        return duplex_page
+
+    return DuplexPage(
+        front=duplex_page.front.rotate(90, expand=True),
+        back=duplex_page.back.rotate(90, expand=True),
+    )
+
 def render_duplex_page(
     bg_image: Image.Image,
     processed_cards: list[ProcessedCard],
     page_layout: PageLayout,
+    label_text: str | None, 
+    label_font: ImageFont.FreeTypeFont,
 ) -> DuplexPage:
+
     
     front_page = bg_image.copy()
     back_page = bg_image.copy()
+
+    if label_text is not None: 
+        draw_front_label(
+            page=front_page,
+            text=label_text,
+            position=page_layout.label_position,
+            angle=page_layout.label_angle,
+            font=label_font,
+        )
 
     for i, card in enumerate(processed_cards):
         # Positions are stored as (row, col) -> (y, x)
@@ -197,33 +181,38 @@ def add_print_bleed_to_page(
     top, bottom, left, right = edges
     bleed_width, bleed_height = bleed
 
-    extend_edge(
-        page,
-        page,
-        (left, top, right, top + 1),
-        (left, top - bleed_height, right, top),
-    )
+    if bleed_height == 0 and bleed_width == 0:
+        return page
 
-    extend_edge(
-        page,
-        page,
-        (left, bottom - 1, right, bottom),
-        (left, bottom, right, bottom + bleed_height),
-    )
+    if bleed_height > 0: 
+        extend_edge(
+            page,
+            page,
+            (left, top, right, top + 1),
+            (left, top - bleed_height, right, top),
+        )
 
-    extend_edge(
-        page,
-        page,
-        (left, top, left + 1, bottom),
-        (left - bleed_width, top, left, bottom),
-    )
+        extend_edge(
+            page,
+            page,
+            (left, bottom - 1, right, bottom),
+            (left, bottom, right, bottom + bleed_height),
+        )
 
-    extend_edge(
-        page,
-        page,
-        (right - 1, top, right, bottom),
-        (right, top, right + bleed_width, bottom),
-    )
+    if bleed_width > 0:
+        extend_edge(
+            page,
+            page,
+            (left, top, left + 1, bottom),
+            (left - bleed_width, top, left, bottom),
+        )
+
+        extend_edge(
+            page,
+            page,
+            (right - 1, top, right, bottom),
+            (right, top, right + bleed_width, bottom),
+        )
 
     return page
 
@@ -333,58 +322,54 @@ def draw_outlines(
 # Label
 #============================
 def draw_rotated_text(
-    image: Image.Image,
-    position: tuple[int, int],
     text: str,
     font: ImageFont.FreeTypeFont,
     angle: float,
     fill: str = "black",
-) -> None:
+) -> Image.Image:
     bbox = font.getbbox(text)
     width = int(bbox[2] - bbox[0])
     height = int(bbox[3] - bbox[1])
 
     text_image = Image.new("RGBA", (width, height), (0,0,0,0))
-    draw = ImageDraw.Draw(text_image)
-    draw.text((-bbox[0], -bbox[1]), text, fill=fill, font=font)
-    text_image = text_image.rotate(
+    ImageDraw.Draw(text_image).text(
+        (-bbox[0], -bbox[1]), 
+        text, 
+        fill=fill, 
+        font=font,
+    )
+
+    return text_image.rotate(
         angle,
         expand=True,
         resample=Image.Resampling.BICUBIC,
-    )
-
-    image.paste(
-        text_image,
-        (
-            position[0] - text_image.width // 2,
-            position[1] - text_image.height // 2,
-        ),
-        text_image,
     )
 
 
 def draw_front_label(
     page: Image.Image,
     text: str,
-    page_width: int,
-    page_height: int,
-    label_margin: int,
-    orientation: Orientation,
+    position: tuple[int, int],
+    angle: int,
     font: ImageFont.FreeTypeFont,
 ) -> None:
     draw = ImageDraw.Draw(page)
 
-    if orientation == Orientation.LANDSCAPE:
-        draw_rotated_text(
-            page,
-            (page_width - label_margin, page_height // 2),
-            text,
-            font,
-            90,
+    if angle:
+        text_image = draw_rotated_text(text, font, angle)
+
+        page.paste(
+            text_image,
+            (
+                position[0] - text_image.width // 2,
+                position[1] - text_image.height // 2,
+            ),
+            text_image,
         )
+
     else:
         draw.text(
-            (page_width // 2, page_height - label_margin),
+            position,
             text,
             fill="black",
             anchor="mm",

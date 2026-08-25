@@ -4,53 +4,17 @@
 #==============================================================================
 
 from collections.abc import Collection, Iterator
-from dataclasses import dataclass
 from itertools import islice
 from pathlib import Path
 
 from PIL import Image, ImageOps
 
-from src.draw import CardRenderParams
-from src.images import process_card_side
 from src.paths import ImagePaths, get_relative_stem, index_image_paths, select_back_image_path
+from src.render_models import Card, CardSide, Cards
 
 #============================
 # Classes  
 #============================
-# Processed = Images, Unprocessed = Paths 
-
-@dataclass 
-class CardSide:
-    name: Path
-    path: Path
-    image: Image.Image | None = None
-
-@dataclass
-class Card:
-    front: CardSide
-    back: CardSide | None
-
-@dataclass
-class Cards:
-    cards: list[Card]
-    default_back: CardSide | None
-
-@dataclass(frozen=True)
-class ProcessedCardSide:
-    image: Image.Image
-    offset_x: int
-    offset_y: int
-    synthetic_bleed_width: int
-    synthetic_bleed_height: int
-
-@dataclass
-class ProcessedCard:
-    front: ProcessedCardSide
-    back: ProcessedCardSide | None
-
-@dataclass
-class ProcessedCards:
-    cards: list[ProcessedCard]
 
 #============================
 # Find Cards

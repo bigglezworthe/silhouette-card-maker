@@ -12,6 +12,7 @@ from typing import Self, Generic, TypeVar
 from pydantic import BaseModel, RootModel, model_validator
 
 from src.enums import Orientation
+from src.measurements import parse_to_mm
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -20,13 +21,18 @@ T = TypeVar("T", bound=BaseModel)
 #============================
 # [!] Asserting that this must exist. 
 class RegistrationSettings(BaseModel):
-    inset: str 
+    inset: str | None = None
+    thickness: str | None = None
+    length: str | None = None
+
+class ResolvedRegistrationSettings(BaseModel):
+    inset: str
     thickness: str
     length: str
 
 class VariantRegistrationSettings(BaseModel):
-    default: RegistrationSettings
-    borderless: RegistrationSettings
+    default: ResolvedRegistrationSettings
+    borderless: ResolvedRegistrationSettings
 
 class DefaultSettings(BaseModel):
     ppi: int
@@ -50,7 +56,7 @@ class PaperSizeDef(BaseModel):
 
     @model_validator(mode="after")
     def validate_orientation(self) -> Self:
-        if self.width < self.height:
+        if parse_to_mm(self.width) < parse_to_mm(self.height):
             # [!] Why not just swap them?
             raise ValueError(
                 f"Paper width ({self.width}) must be >= height ({self.height})." 
@@ -143,9 +149,7 @@ class LayoutConfig(BaseModel):
     paper_layouts: PaperLayoutDefs
     specialty_layouts: SpecialtyLayoutDefs
 
-# [!] Slightly misleading name given the rest of the classes
-# [!] this is essentially the actual layout object the program uses
-# [!] whereas the other classes deal with JSON import structure
+# [!] Not really resolved when so many NONE eh?
 #============================
 # Output
 #============================

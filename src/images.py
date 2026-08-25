@@ -2,29 +2,20 @@
 # images.py
 #     Place images on the page and perform non-crop manipulations
 # ==============================================================================
-from dataclasses import dataclass
 from itertools import pairwise
 import math
 
 from PIL import Image
 
 from src.calcs import crop_and_scale_image
-from src.cards import Card, CardSide, ProcessedCard, ProcessedCardSide
-from src.draw import CardRenderParams, RenderGeometry, SideRenderParams
 from src.enums import FitMode
 from src.measurements import parse_measurement
+from src.render_models import CardRenderParams, RenderGeometry, SideRenderParams, Card, CardSide, ProcessedCard, ProcessedCardSide
 
 # Approximately 1.25mm of bleed in px assuming 300ppi: ceil(1.25mm * 1in/25.4mm * 300px/1in)
 # [!] rename to DEFAULT_PRINT_BLEED
 MINIMUM_BLEED = 15
 
-@dataclass(frozen=True)
-class CardRenderGeometry:
-    width: int
-    height: int
-    print_bleed_x: int
-    print_bleed_y: int
-    ppi_scale: float
 
 
 def calculate_max_print_bleed(
@@ -105,15 +96,6 @@ def convert_inch_to_crop(
     return (crop_x_percent, crop_y_percent)
 
 
-def parse_crop_string(crop_string: str | None) -> tuple[float, str]:
-    if crop_string is None:
-        return 0, ""
-
-    valid_units = ["", "mm", "in", "%"]
-    try: 
-        return parse_measurement(crop_string, valid_units)
-    except ValueError as e:
-        raise ValueError(f"Invalid Crop Format: {crop_string}") from e
 
 def process_card_side(
     card_side: CardSide,

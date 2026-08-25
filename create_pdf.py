@@ -3,19 +3,19 @@ import click
 from pathlib import Path
 
 from src.cards import find_cards
-from src.draw import CardRenderOptions, SideRenderOptions
 from src.enums import Orientation, Registration, FitMode 
 from src.measurements import DEFAULT_PPI 
-from src.paths import ImagePaths, Paths, load_image_paths, prepare_output_path
+from src.paths import ImagePaths, Paths, prepare_output_path
 from src.pdf import generate_pdf
 from src.layouts import (
     get_all_card_size_names,
     get_all_paper_size_names,
     get_all_specialty_layout_names,
-    load_defaults,
     load_layouts,
     prepare_layout,
 )
+
+from src.render_models import CardRenderOptions, SideRenderOptions
 
 #============================
 # Initialize Defaults

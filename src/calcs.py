@@ -3,12 +3,10 @@ import math
 
 from PIL import Image
 
-from src.draw import CardRenderOptions, CardRenderParams, SideRenderParams
+from src.render_models import CardRenderOptions, CardRenderParams, SideRenderParams, RegistrationParams
 from src.enums import FitMode
-from src.images import parse_crop_string
 from src.layout_models import CardSizeDef, RegistrationSettings
-from src.measurements import parse_to_in, parse_to_mm, parse_to_px
-from src.page_manager import RegistrationParams
+from src.measurements import parse_measurement, parse_to_in, parse_to_mm, parse_to_px
 
 #============================
 # Unit Conversion
@@ -56,6 +54,17 @@ def calculate_render_params(
 #============================
 # Crop
 #============================
+# [!] Doesn't really belong here...
+def parse_crop_string(crop_string: str | None) -> tuple[float, str]:
+    if crop_string is None:
+        return 0, ""
+
+    valid_units = ["", "mm", "in", "%"]
+    try: 
+        return parse_measurement(crop_string, valid_units)
+    except ValueError as e:
+        raise ValueError(f"Invalid Crop Format: {crop_string}") from e
+
 def calculate_crop_percent(crop_str: str | None, dimension_str: str) -> float:
     value, unit = parse_crop_string(crop_str) 
     match unit:

@@ -7,15 +7,12 @@ from __future__ import annotations
 import json
 import os
 
-from src.classes import PageLayout
 from src.layout_models import (
     CardLayoutDef,
     CardSizeDef,
     CardSizeDefs,
     DefaultSettings,
     LayoutConfig,
-    LayoutDef,
-    LayoutDefs,
     PaperLayoutDef,
     PaperLayoutDefs,
     PaperSizeDef,
@@ -23,7 +20,7 @@ from src.layout_models import (
     ResolvedLayout,
     SpecialtyCardSizeDef,
     SpecialtyLayoutDefs,
-    SpecialtyPaperSizeDef
+    SpecialtyPaperSizeDef,
 )
 from src.paths import Paths
 from src.enums import Orientation, Variant
@@ -32,14 +29,13 @@ from typing import TypeVar
 from pathlib import Path
 from pydantic import BaseModel
 
-from src.pdf import create_template_name
 
 T = TypeVar("T", bound=BaseModel)
 
 LAYOUTS_PATH = Paths.assets / "layouts"
 CARD_SIZE_DEF_PATH = Paths.assets / "card_sizes.json"
 PAPER_SIZE_DEF_PATH = Paths.assets / "paper_sizes.json"
-SPECIALTY_LAYOUTS_DEF_PATH = LAYOUTS_PATH / "specialty.json"
+SPECIALTY_LAYOUTS_DEF_PATH = LAYOUTS_PATH / "specialty" / "specialty.json"
 DEFAULT_SETTINGS_PATH = Paths.assets / "defaults.json" 
 
 
@@ -55,7 +51,7 @@ USER_LAYOUTS_PATH = LAYOUTS_PATH / "user"
 
 USER_CARD_SIZES_PATH = USER_LAYOUTS_PATH / "card_size"
 USER_PAPER_SIZES_PATH = USER_LAYOUTS_PATH / "paper_size"
-USER_PAPER_LAYOUTS_PATH = USER_LAYOUTS_PATH / "layout"
+USER_PAPER_LAYOUTS_PATH = USER_LAYOUTS_PATH / "layouts"
 USER_SPECIALTY_LAYOUTS_PATH = USER_LAYOUTS_PATH / "specialty"
 
 USER_LAYOUTS_ENV = "SCM_USER_LAYOUTS"
@@ -69,6 +65,12 @@ PAPER_SIZE_PRIORITY = ["letter", "tabloid", "a4", "a3", "arch_b"]
 CARD_SIZE_PRIORITY = ["standard", "poker", "bridge"]
 
 DEFAULT_ORIENTATION = Orientation.LANDSCAPE
+
+def create_template_name(
+    paper_size: str, card_size: str, variant: Variant, version: int
+) -> str:
+    var_string = f"{variant.value}-" if variant != Variant.DEFAULT else ""
+    return f"{paper_size}-{card_size}-{var_string}v{version}"
 
 # ============================
 # User Layouts
@@ -290,6 +292,7 @@ def get_all_specialty_layout_names() -> list[str]:
 # ============================
 # Load Config
 # ============================
+# [!] Why are we loading everything? Just load the requested types. 
 def load_from_json(path: Path, model: type[T]) -> T:
     with open(path, 'r') as f:
         data: object = json.load(f)
@@ -320,7 +323,6 @@ def load_paper_layouts() -> PaperLayoutDefs:
     paper_layout_defs = PaperLayoutDefs(paper_layouts)
     merge_user_paper_layouts(paper_layout_defs)
     return paper_layout_defs
-
 
 def load_specialty_layouts() -> SpecialtyLayoutDefs: 
     specialty_layouts = load_from_json(SPECIALTY_LAYOUTS_DEF_PATH, SpecialtyLayoutDefs)

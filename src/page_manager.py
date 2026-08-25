@@ -16,9 +16,10 @@ import math
 from PIL import Image, ImageDraw
 from enum import Enum
 
-from src.layout_models import RegistrationSettings, ResolvedLayout
+from src.layout_models import RegistrationSettings, ResolvedLayout, ResolvedRegistrationSettings
 from src.enums import Orientation, Registration
 from src.measurements import DEFAULT_PPI, parse_to_px
+from src.render_models import PageLayout
 
 # [!] Enum? Dataclass?
 # Registration mark constraints (in mm)
@@ -35,30 +36,6 @@ BORDERLESS_INSET_MM = 10
 BORDERLESS_EXPANSION_MM = (MIN_REG_INSET_MM - BORDERLESS_INSET_MM) * 2
 
 
-# [!] Might need renaming to avoid confusion with Layout_Models
-@dataclass(frozen=True)
-class PageLayout:
-    card_width_px: int
-    card_height_px: int
-    paper_width_px: int
-    paper_height_px: int
-    card_positions: list[tuple[int, int]]
-    back_positions: list[tuple[int, int]]
-    num_rows: int
-    num_cols: int
-    max_length_mm: float 
-
-@dataclass(frozen=True)
-class RegistrationOptions:
-    thickness: str
-    inset: str
-    length: str
-
-@dataclass(frozen=True)
-class RegistrationParams:
-    thickness: int
-    inset: int
-    length: int
 
 class CornerMatrix(Enum):
     TOP_LEFT = (-1, 1)
@@ -90,7 +67,6 @@ def draw_reg_corner_lines(
         (x - x_dir * thickness, y + y_dir * effective_length),
         (x, y + y_dir * effective_length),
     ]
-    print(f"Drawing registration polygon: {points}")
     draw.polygon(points, fill="black")
 
 def generate_reg_mark(
@@ -141,7 +117,6 @@ def generate_reg_mark(
             (inset_px - pil_offset, inset_px - pil_offset), 
             (inset_px + five + pil_offset, inset_px + five + pil_offset) 
         ]
-        print(f"Reg.THREE detected. Drawing rectangle at {coords}")
         draw.rectangle(
             coords,
             fill="black"
@@ -152,7 +127,6 @@ def generate_reg_mark(
         render_corners.append(CornerMatrix.BOTTOM_RIGHT)
 
     for corner in render_corners:
-        print(f"Drawing corner: {corner.value}")
         x_dir, y_dir = corner.value
         x = inset_px if x_dir < 0 else paper_width_px - inset_px
         y = inset_px if y_dir > 0 else paper_height_px - inset_px
@@ -174,7 +148,7 @@ def generate_reg_mark(
     return img
 
 def resolve_reg_opts(
-    default_reg: RegistrationSettings,
+    default_reg: ResolvedRegistrationSettings,
     layout_reg: RegistrationSettings | None,
 ) -> RegistrationSettings:
     
@@ -187,11 +161,11 @@ def resolve_reg_opts(
         effective_length = layout_reg.length
         effective_inset = layout_reg.inset
 
-
+    # These will never be blank.
     return RegistrationSettings(
-        thickness = effective_thickness or "",
-        length = effective_length or "",
-        inset = effective_inset or "",
+        thickness = effective_thickness,
+        length = effective_length,
+        inset = effective_inset,
     )
 
 
@@ -457,16 +431,46 @@ def mirror_card_positions(
         for row, col in card_positions
     ]
 
+def calculate_label_position(
+    inset: int,
+    thickness: int,
+    page_width: int,
+    page_height: int,
+    borderless: bool,
+    orientation: Orientation,
+) -> tuple[tuple[int, int], int]: 
+    if borderless:
+        label_margin = inset
+    else:
+        label_margin = inset - (thickness * 2)
+
+    if orientation == Orientation.LANDSCAPE:
+        label_position = (
+            page_width - label_margin,
+            page_height // 2,
+        )
+        label_angle = 90
+    else:
+        label_position = (
+            page_width // 2,
+            page_height - label_margin, 
+        )
+        label_angle = 0
+
+    return label_position, label_angle
+
 def generate_layout(
     orientation: Orientation,
     card_width: str,
     card_height: str,
     paper_width: str,
     paper_height: str,
-    inset: str,
-    length: str,
+    inset: str | None,
+    thickness: str | None,
+    length: str | None,
     ppi_scale: float,
-    skip_indices: list[int]
+    skip_indices: list[int],
+    borderless: bool,
 ) -> PageLayout:
     """
     Compute card positions on a page, accounting for margins, bleed,
@@ -478,6 +482,9 @@ def generate_layout(
 
     # Equivalent to double the bleed
     CARD_DISTANCE = "1.25mm"
+    inset = inset or f"{MIN_REG_INSET_MM}mm"
+    thickness = thickness or f"{MIN_REG_THICKNESS_MM}mm"
+    length = length or f"{MIN_REG_LENGTH_MM}mm"
 
     # Convert all dimensions to pixels
     card_distance_px = parse_to_px(CARD_DISTANCE, ppi_scale)
@@ -486,6 +493,7 @@ def generate_layout(
     card_width_px = parse_to_px(card_width, ppi_scale)
     card_height_px = parse_to_px(card_height, ppi_scale)
     inset_px = parse_to_px(inset, ppi_scale)
+    thickness_px = parse_to_px(thickness, ppi_scale)
     length_px = parse_to_px(length, ppi_scale)
 
     # Normalize orientation
@@ -539,6 +547,15 @@ def generate_layout(
         cols = x_pos,
     )
 
+    label_position, label_angle = calculate_label_position(
+        inset=inset_px,
+        thickness=thickness_px,
+        page_width=page_width_px,
+        page_height=page_height_px,
+        borderless=borderless,
+        orientation=orientation,
+    )
+
     return PageLayout(
         card_width_px = card_width_px,
         card_height_px = card_height_px,
@@ -546,6 +563,8 @@ def generate_layout(
         paper_height_px = page_height_px,
         card_positions = valid_positions,
         back_positions = mirrored_positions,
+        label_position = label_position,
+        label_angle = label_angle,
         num_rows = len(y_pos),
         num_cols = len(x_pos),
         max_length_mm = max_length_mm,
