@@ -56,10 +56,7 @@ def find_cards(image_dirs: ImagePaths, only_front_images: bool = False) -> Cards
     for key, path in front_image_paths.items():
         cards.append(Card(front=CardSide(name=key, path=path), back=None))
     
-
-    print("Looking for card back in:", image_dirs.back_dir)
     card_back = find_default_back(image_dirs.back_dir) if not only_front_images else None
-    print("Search complete. Found", card_back)
 
     return Cards(cards=cards, default_back=card_back)
 
@@ -70,7 +67,6 @@ def find_default_back(back_dir: Path) -> CardSide | None:
         print(f"No back image provided from back image directory: {back_dir}")
         return None
     back_name = get_relative_stem(back_image_path, back_dir)
-    print(f"Card back found: {back_name}")
     return CardSide(name=back_name, path=back_image_path)
 
 def load_card_side(card_side: CardSide) -> CardSide:

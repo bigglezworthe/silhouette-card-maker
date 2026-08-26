@@ -140,7 +140,6 @@ def cli(
         ),
         orientation = registration_orientation,
     )
-
     
     generate_pdf(
         image_paths = image_paths,

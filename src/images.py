@@ -144,6 +144,12 @@ def process_card_side(
     if extend_corners > 0:
         image = fill_rounded_corners(image, render_params.extend_corners_radius)
 
+    print(
+        "processed side:",
+        f"image={image.size}",
+        f"synthetic_bleed=({synthetic_bleed_width}, {synthetic_bleed_height})",
+    )
+
     return ProcessedCardSide(
         image = image,
         offset_x = offset_x,

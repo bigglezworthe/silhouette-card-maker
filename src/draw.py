@@ -95,17 +95,21 @@ def render_duplex_page(
         front_y, front_x = page_layout.card_positions[i]
         back_y, back_x = page_layout.back_positions[i]
 
-        front_page.paste(
-            card.front.image, 
-            (front_x + card.front.offset_x, front_y + card.front.offset_y)
+        render_card_side(
+            page=front_page,
+            card_side=card.front,
+            x=front_x,
+            y=front_y,
         )
 
         if card.back is None:
             continue
 
-        back_page.paste(
-            card.back.image, 
-            (back_x + card.back.offset_x, back_y + card.back.offset_y)
+        render_card_side(
+            page=back_page,
+            card_side=card.back,
+            x=back_x,
+            y=back_y,
         )
 
     return DuplexPage(front_page, back_page)
@@ -244,6 +248,13 @@ def add_print_bleed(
         min(render_params.back.extend_bleed, render_geometry.max_print_bleed_width),
         min(render_params.back.extend_bleed, render_geometry.max_print_bleed_height),
     )
+    print(
+        "print bleed:",
+        f"front={bleed_front}",
+        f"back={bleed_back}",
+        f"max=({render_geometry.max_print_bleed_width}, "
+        f"{render_geometry.max_print_bleed_height})",
+    )
 
     return DuplexPage(
         front = add_print_bleed_to_page(duplex_page.front, edges, bleed_front),
@@ -263,11 +274,15 @@ def render_card_side(
 ) -> None:
     card_image = card_side.image
 
-    card_image = extend_image_edges(
-        card_image,
-        card_side.synthetic_bleed_width,
-        card_side.synthetic_bleed_height,
-    )
+    if (
+        card_side.synthetic_bleed_height > 0
+        or card_side.synthetic_bleed_width > 0
+    ):
+        card_image = extend_image_edges(
+            card_image,
+            card_side.synthetic_bleed_width,
+            card_side.synthetic_bleed_height,
+        )
 
     page.paste(
         card_image,
