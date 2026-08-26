@@ -124,14 +124,11 @@ def process_card_side(
     
         image = crop_result.image
         offset_x, offset_y = crop_result.offset
-        synthetic_bleed_width, synthetic_bleed_height = crop_result.synthetic_bleed
 
     else:
         image = image.resize((geometry.page_layout.card_width_px, geometry.page_layout.card_height_px))
         offset_x = 0
         offset_y = 0
-        synthetic_bleed_width = geometry.max_print_bleed_width
-        synthetic_bleed_height = geometry.max_print_bleed_height
 
     extend_edges = render_params.extend_edges
     if extend_edges > 0:
@@ -144,18 +141,10 @@ def process_card_side(
     if extend_corners > 0:
         image = fill_rounded_corners(image, render_params.extend_corners_radius)
 
-    print(
-        "processed side:",
-        f"image={image.size}",
-        f"synthetic_bleed=({synthetic_bleed_width}, {synthetic_bleed_height})",
-    )
-
     return ProcessedCardSide(
         image = image,
         offset_x = offset_x,
         offset_y = offset_y,
-        synthetic_bleed_width = synthetic_bleed_width,
-        synthetic_bleed_height = synthetic_bleed_height, 
     )
 
 def process_cards(

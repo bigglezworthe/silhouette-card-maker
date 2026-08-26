@@ -3,6 +3,7 @@
 #     Drawing onto the page.
 # ==============================================================================
 from dataclasses import dataclass
+from itertools import pairwise
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -95,22 +96,31 @@ def render_duplex_page(
         front_y, front_x = page_layout.card_positions[i]
         back_y, back_x = page_layout.back_positions[i]
 
-        render_card_side(
-            page=front_page,
-            card_side=card.front,
-            x=front_x,
-            y=front_y,
+        front_page.paste(
+            card.front.image,
+            (front_x + card.front.offset_x, front_y + card.front.offset_y),
         )
 
         if card.back is None:
             continue
 
-        render_card_side(
-            page=back_page,
-            card_side=card.back,
-            x=back_x,
-            y=back_y,
+        back_page.paste(
+            card.back.image,
+            (back_x + card.back.offset_x, back_y + card.back.offset_y),
         )
+    
+    fill_card_gaps(
+        front_page, 
+        page_layout.card_positions, 
+        page_layout.card_width_px, 
+        page_layout.card_height_px,
+    )
+    fill_card_gaps(
+        back_page, 
+        page_layout.back_positions, 
+        page_layout.card_width_px, 
+        page_layout.card_height_px,
+    )
 
     return DuplexPage(front_page, back_page)
 
@@ -220,7 +230,125 @@ def add_print_bleed_to_page(
 
     return page
 
+def fill_horizontal_card_gaps(
+    page: Image.Image,
+    positions: list[tuple[int ,int]],
+    card_width: int,
+    card_height: int,
+) -> None:
+    pos = sorted(positions, key=lambda position: (position[0], position[1]))
+    
+    for left, right in pairwise(pos):
+        left_y, left_x = left
+        right_y, right_x = right
+        
+        if left_y != right_y:
+            continue
+
+        gap_start = left_x + card_width
+        gap_end = right_x
+
+        gap_width = gap_end - gap_start
+
+        if gap_width <= 0:
+            continue
+
+        fill_left = gap_width // 2
+        fill_right = gap_width - fill_left
+
+        print(
+            "horizontal:",
+            (left_x, left_y),
+            (right_x, right_y),
+            "gap:",
+            right_x - (left_x + card_width),
+        )
+
+        extend_edge(
+            page,
+            page,
+            (gap_start - 1, left_y, gap_start, left_y + card_height),
+            (gap_start, left_y, gap_start + fill_left, left_y + card_height),
+        )
+        extend_edge(
+            page,
+            page,
+            (gap_end, right_y, gap_end + 1, right_y + card_height),
+            (gap_end - fill_right, right_y, gap_end, right_y + card_height),
+        )
+
+def fill_vertical_card_gaps(
+    page: Image.Image,
+    positions: list[tuple[int, int]],
+    card_width: int,
+    card_height: int,
+) -> None:
+    pos = sorted(positions, key=lambda position: (position[1], position[0]))
+
+    for top, bottom in pairwise(pos):
+        top_y, top_x = top
+        bottom_y, bottom_x = bottom
+        
+        if top_x != bottom_x:
+            continue
+
+        gap_start = top_y + card_height
+        gap_end = bottom_y
+
+        gap_height = gap_end - gap_start
+
+        if gap_height <= 0:
+            continue
+
+        fill_top = gap_height // 2
+        fill_bottom = gap_height - fill_top
+
+        print(
+            "vertical:",
+            (top_x, top_y),
+            (bottom_x, bottom_y),
+            "gap:",
+            bottom_y - (top_y + card_height),
+        )
+
+        extend_edge(
+            page,
+            page,
+            (top_x, gap_start - 1, top_x + card_width, gap_start),
+            (top_x, gap_start, top_x + card_width, gap_start + fill_top,),
+        )
+        extend_edge(
+            page,
+            page,
+            (bottom_x, gap_end, bottom_x + card_width, gap_end + 1),
+            (bottom_x, gap_end - fill_bottom, bottom_x + card_width, gap_end),
+        )
+
+def fill_card_gaps(
+    page: Image.Image,
+    positions: list[tuple[int, int]],
+    card_width: int,
+    card_height: int,
+) -> None:
+    print("positions:", positions)
+    print("card size:", card_width, card_height)
+
+    fill_horizontal_card_gaps(
+        page, 
+        positions,
+        card_width,
+        card_height,
+    )
+    fill_vertical_card_gaps(
+        page, 
+        positions,
+        card_width,
+        card_height,
+    )
+            
+
 # Print Bleed
+# [!] old. Will either be refactored or removed. 
 def add_print_bleed(
     duplex_page: DuplexPage,
     page_layout: PageLayout,
@@ -274,21 +402,19 @@ def render_card_side(
 ) -> None:
     card_image = card_side.image
 
-    if (
-        card_side.synthetic_bleed_height > 0
-        or card_side.synthetic_bleed_width > 0
-    ):
-        card_image = extend_image_edges(
-            card_image,
-            card_side.synthetic_bleed_width,
-            card_side.synthetic_bleed_height,
-        )
+    print(
+        "edges:",
+        "top-left=", card_image.getpixel((0, 0)),
+        "top-right=", card_image.getpixel((card_image.width - 1, 0)),
+        "bottom-left=", card_image.getpixel((0, card_image.height - 1)),
+        "bottom-right=", card_image.getpixel((card_image.width - 1, card_image.height - 1)),
+    )
 
     page.paste(
         card_image,
         (
-            x + card_side.offset_x - card_side.synthetic_bleed_width,
-            y + card_side.offset_y - card_side.synthetic_bleed_height
+            x + card_side.offset_x,
+            y + card_side.offset_y,
         ),
     )
 

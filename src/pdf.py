@@ -179,12 +179,6 @@ def generate_pdf(
         ppi_scale=ppi_scale,
     )
 
-    print(
-        "extend_bleed:",
-        render_params.front.extend_bleed,
-        render_params.back.extend_bleed,
-    )
-
     reg_params = calculate_reg_params(reg_opts=reg_opts, ppi_scale=ppi_scale)
 
     num_cards = len(page_layout.card_positions)

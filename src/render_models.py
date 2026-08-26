@@ -115,8 +115,6 @@ class ProcessedCardSide:
     image: Image.Image
     offset_x: int
     offset_y: int
-    synthetic_bleed_width: int
-    synthetic_bleed_height: int
 
 @dataclass
 class ProcessedCard:

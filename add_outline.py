@@ -5,10 +5,27 @@ from PIL import Image, ImageDraw
 
 INPUT_DIR = Path("game/front")
 OUTPUT_DIR = Path("game/front")
+
 BORDER_WIDTH = 10
 
+# 2 x 4 card layout, row-major.
+COLORS = [
+    "#e6194b",  # red
+    "#3cb44b",  # green
+    "#4363d8",  # blue
+    "#f58231",  # orange
+    "#911eb4",  # purple
+    "#42d4f4",  # cyan
+    "#f032e6",  # magenta
+    "#bfef45",  # lime
+]
 
-def add_border(image: Image.Image, width: int) -> Image.Image:
+
+def add_outline(
+    image: Image.Image,
+    color: str,
+    width: int,
+) -> Image.Image:
     draw = ImageDraw.Draw(image)
 
     draw.rectangle(
@@ -18,7 +35,7 @@ def add_border(image: Image.Image, width: int) -> Image.Image:
             image.width - 1,
             image.height - 1,
         ),
-        outline="black",
+        outline=color,
         width=width,
     )
 
@@ -26,20 +43,23 @@ def add_border(image: Image.Image, width: int) -> Image.Image:
 
 
 def main() -> None:
-    OUTPUT_DIR.mkdir(exist_ok=True)
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    for path in INPUT_DIR.iterdir():
-        if not path.is_file():
-            continue
+    images = sorted(
+        path
+        for path in INPUT_DIR.iterdir()
+        if path.suffix.lower() in {".png", ".jpg", ".jpeg"}
+    )
 
-        try:
-            with Image.open(path) as image:
-                image = image.convert("RGB")
-                add_border(image, BORDER_WIDTH)
-                image.save(OUTPUT_DIR / path.name)
+    for index, path in enumerate(images):
+        color = COLORS[index % len(COLORS)]
 
-        except (OSError, ValueError):
-            print(f"Skipping {path}")
+        with Image.open(path) as image:
+            image = image.convert("RGB")
+            add_outline(image, color, BORDER_WIDTH)
+            image.save(OUTPUT_DIR / path.name)
+
+        print(f"{path.name}: {color}")
 
 
 if __name__ == "__main__":
