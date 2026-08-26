@@ -67,12 +67,13 @@ def draw_reg_corner_lines(
         (x - x_dir * thickness, y + y_dir * effective_length),
         (x, y + y_dir * effective_length),
     ]
+
     draw.polygon(points, fill="black")
 
 def generate_reg_mark(
     paper_width: str,
     paper_height: str,
-    reg_opts: RegistrationSettings,
+    reg_opts: ResolvedRegistrationSettings,
     dpi_scale: float,
     layout_def: ResolvedLayout,
     registration: Registration,
@@ -91,7 +92,7 @@ def generate_reg_mark(
     inset_px = parse_to_px(reg_opts.inset, dpi_scale)
     thickness_px = parse_to_px(reg_opts.thickness, dpi_scale)
     length_px = parse_to_px(reg_opts.length, dpi_scale)
-
+    
     min_reg_length_px = parse_to_px(f"{MIN_REG_LENGTH_MM}mm", dpi_scale)
     max_reg_length_px = parse_to_px(f"{MAX_REG_LENGTH_MM}mm", dpi_scale)
     min_reg_thickness_px = parse_to_px(f"{MIN_REG_THICKNESS_MM}mm", dpi_scale)
@@ -150,22 +151,28 @@ def generate_reg_mark(
 def resolve_reg_opts(
     default_reg: ResolvedRegistrationSettings,
     layout_reg: RegistrationSettings | None,
-) -> RegistrationSettings:
-    
-    effective_thickness = default_reg.thickness
-    effective_length = default_reg.length
-    effective_inset = default_reg.inset
+) -> ResolvedRegistrationSettings:
 
-    if layout_reg is not None: 
-        effective_thickness = layout_reg.thickness
-        effective_length = layout_reg.length
-        effective_inset = layout_reg.inset
+    if layout_reg is None:
+        return default_reg
 
     # These will never be blank.
-    return RegistrationSettings(
-        thickness = effective_thickness,
-        length = effective_length,
-        inset = effective_inset,
+    return ResolvedRegistrationSettings(
+        thickness = (
+            layout_reg.thickness
+            if layout_reg.thickness is not None
+            else default_reg.thickness
+        ),
+        length = (
+            layout_reg.length
+            if layout_reg.length is not None
+            else default_reg.length
+        ),
+        inset = (
+            layout_reg.inset
+            if layout_reg.inset is not None
+            else default_reg.inset
+        ),
     )
 
 
@@ -465,9 +472,9 @@ def generate_layout(
     card_height: str,
     paper_width: str,
     paper_height: str,
-    inset: str | None,
-    thickness: str | None,
-    length: str | None,
+    inset: str,
+    thickness: str,
+    length: str,
     ppi_scale: float,
     skip_indices: list[int],
     borderless: bool,
@@ -482,9 +489,6 @@ def generate_layout(
 
     # Equivalent to double the bleed
     CARD_DISTANCE = "1.25mm"
-    inset = inset or f"{MIN_REG_INSET_MM}mm"
-    thickness = thickness or f"{MIN_REG_THICKNESS_MM}mm"
-    length = length or f"{MIN_REG_LENGTH_MM}mm"
 
     # Convert all dimensions to pixels
     card_distance_px = parse_to_px(CARD_DISTANCE, ppi_scale)

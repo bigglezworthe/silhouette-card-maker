@@ -5,7 +5,7 @@ from PIL import Image
 
 from src.render_models import CardRenderOptions, CardRenderParams, SideRenderParams, RegistrationParams
 from src.enums import FitMode
-from src.layout_models import CardSizeDef, RegistrationSettings
+from src.layout_models import CardSizeDef, ResolvedRegistrationSettings
 from src.measurements import parse_measurement, parse_to_in, parse_to_mm, parse_to_px
 
 #============================
@@ -215,7 +215,7 @@ def crop_and_scale_image(
 #============================
 
 def calculate_reg_params(
-    reg_opts: RegistrationSettings,
+    reg_opts: ResolvedRegistrationSettings,
     ppi_scale: float,
 ) -> RegistrationParams:
     return RegistrationParams(

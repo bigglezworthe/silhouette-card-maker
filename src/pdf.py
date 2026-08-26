@@ -153,8 +153,6 @@ def generate_pdf(
         layout_def.registration,
     )
 
-    reg_params = calculate_reg_params(reg_opts=reg_opts, ppi_scale=ppi_scale)
-
     card_size_def = layout_def.card_size
     paper_size_def = layout_def.paper_size
 
@@ -181,6 +179,7 @@ def generate_pdf(
         ppi_scale=ppi_scale,
     )
 
+    reg_params = calculate_reg_params(reg_opts=reg_opts, ppi_scale=ppi_scale)
 
     num_cards = len(page_layout.card_positions)
     if num_cards == 0:
@@ -201,7 +200,7 @@ def generate_pdf(
     )
 
     # ==============================
-    # Page Manager
+    # Render Pages
     # ==============================
     pages: list[DuplexPage] = []
 
@@ -225,7 +224,6 @@ def generate_pdf(
                 loaded_card_back, render_params.back, render_geometry
             )
 
-    print("registration:", reg_image.size)
     for sheet_number, card_batch in enumerate(
         batch_cards(cards.cards, len(page_layout.card_positions)), 
         start=1,
@@ -248,8 +246,6 @@ def generate_pdf(
             label_text=label_text,
             label_font=ImageFont.truetype(LABEL_FONT, 40 * ppi_scale),
         )
-        if sheet_number == 1:
-            print("duplex_front_page:", duplex_page.front.size)
 
         processed_duplex_page = add_print_bleed(
             duplex_page,
@@ -257,13 +253,8 @@ def generate_pdf(
             render_geometry,
             render_params,
         )
-        if sheet_number == 1:
-            print("processed:", processed_duplex_page.front.size)
 
         normalized_duplex_page = normalize_pages(processed_duplex_page, orientation)
-        if sheet_number == 1:
-            print("normalized:", normalized_duplex_page.front.size)
-
 
         pages.append(normalized_duplex_page)
 
@@ -278,7 +269,6 @@ def generate_pdf(
             page_layout,
             render_geometry.radius,
         )
-    print("outline:", pages[0].front.size)
 
     if load_offset:
         saved_offset = load_saved_offset()
@@ -295,7 +285,6 @@ def generate_pdf(
 
     images = [image for page in pages for image in (page.front, page.back)]
 
-    print("output_res:", int(DEFAULT_PPI * ppi_scale))
     if output_images:
         for i, image in enumerate(images):
             image.save(
