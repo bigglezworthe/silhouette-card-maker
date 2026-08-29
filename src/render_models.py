@@ -16,6 +16,7 @@ class PageLayout:
     paper_height_px: int
     card_positions: list[tuple[int, int]]
     back_positions: list[tuple[int, int]]
+    card_placements: list[bool]
     label_position: tuple[int, int]
     label_angle: int
     num_rows: int
@@ -33,6 +34,12 @@ class RegistrationParams:
     thickness: int
     inset: int
     length: int
+
+@dataclass(frozen=True)
+class CardPlacement:
+    row: int
+    col: int
+    card_index: int | None
 
 #==========================================================
 # draw.py
@@ -136,4 +143,6 @@ class CardRenderGeometry:
     print_bleed_y: int
     ppi_scale: float
 
-
+#==========================================================
+# misc
+#==========================================================

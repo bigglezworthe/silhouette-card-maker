@@ -181,7 +181,7 @@ def generate_pdf(
 
     reg_params = calculate_reg_params(reg_opts=reg_opts, ppi_scale=ppi_scale)
 
-    num_cards = len(page_layout.card_positions)
+    num_cards = sum(page_layout.card_placements)
     if num_cards == 0:
         raise ValueError(
             f'Card size "{card_size_name}" does not fit on paper size "{paper_size_name}".'
@@ -225,7 +225,7 @@ def generate_pdf(
             )
 
     for sheet_number, card_batch in enumerate(
-        batch_cards(cards.cards, len(page_layout.card_positions)), 
+        batch_cards(cards.cards, num_cards), 
         start=1,
     ):
         loaded_cards = load_cards(card_batch)

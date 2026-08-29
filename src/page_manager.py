@@ -19,7 +19,7 @@ from enum import Enum
 from src.layout_models import RegistrationSettings, ResolvedLayout, ResolvedRegistrationSettings
 from src.enums import Orientation, Registration
 from src.measurements import DEFAULT_PPI, parse_to_px
-from src.render_models import PageLayout
+from src.render_models import CardPlacement, PageLayout
 
 # [!] Enum? Dataclass?
 # Registration mark constraints (in mm)
@@ -409,33 +409,23 @@ def compute_card_positions(
 def build_card_positions(
     rows: list[int],
     cols: list[int],
-    skips: set[int],
 ) -> list[tuple[int, int]]:
-    positions = [
-        (row, col)
-        for row in rows
-        for col in cols
-    ]
-
-    return [
-        position
-        for index, position in enumerate(positions)
-        if index not in skips
-    ]
+    return [(row, col) for row in rows for col in cols]
 
 def mirror_card_positions(
-    card_positions: list[tuple[int,int]],
     rows: list[int],
     cols: list[int],
     mirror_rows: bool = True,
     mirror_cols: bool = True,
 ) -> list[tuple[int, int]]:
+    row_sum = min(rows) + max(rows)
+    col_sum = min(cols) + max(cols)
     return[
         (
-            min(rows) + max(rows) - row if mirror_rows else row, 
-            min(cols) + max(cols) - col if mirror_cols else col
+            row_sum - row if mirror_rows else row, 
+            col_sum - col if mirror_cols else col,
         ) 
-        for row, col in card_positions
+        for row in rows for col in cols
     ]
 
 def calculate_label_position(
@@ -465,6 +455,24 @@ def calculate_label_position(
         label_angle = 0
 
     return label_position, label_angle
+
+def resolve_card_placements(
+    skip_indices: Collection[int],
+    num_cards: int,
+) -> list[bool]:
+    valid_indices = {n for n in skip_indices if n < num_cards}
+    invalid_indices = set(skip_indices) - valid_indices 
+
+    if len(invalid_indices) > 0:
+        print(
+            "Ignoring skip indices that are outside range "
+            + f"0-{num_cards - 1}: {invalid_indices}"
+        )
+
+    if len(valid_indices) == num_cards:
+        raise ValueError("You cannot skip all cards per page!")
+
+    return [index not in valid_indices for index in range(num_cards)] 
 
 def generate_layout(
     orientation: Orientation,
@@ -533,22 +541,13 @@ def generate_layout(
     )
     # [!] Need to find a better conversion.
     max_length_mm = round(max_length_px * 25.4 / (ppi_scale * DEFAULT_PPI), 2)
+    
+    card_positions = build_card_positions(y_pos, x_pos)
+    back_positions = mirror_card_positions(y_pos, x_pos)
 
-    skip_indices_set = resolve_skipped_indices(
+    card_placements = resolve_card_placements(
         skip_indices = skip_indices,
-        num_cards = len(y_pos) * len(x_pos),
-    )
-
-    valid_positions = build_card_positions(
-        rows = y_pos,
-        cols = x_pos,
-        skips = skip_indices_set,
-    )
-
-    mirrored_positions = mirror_card_positions(
-        card_positions = valid_positions,
-        rows = y_pos,
-        cols = x_pos,
+        num_cards = len(card_positions),
     )
 
     label_position, label_angle = calculate_label_position(
@@ -565,8 +564,9 @@ def generate_layout(
         card_height_px = card_height_px,
         paper_width_px = page_width_px,
         paper_height_px = page_height_px,
-        card_positions = valid_positions,
-        back_positions = mirrored_positions,
+        card_positions = card_positions,
+        back_positions = back_positions,
+        card_placements = card_placements,
         label_position = label_position,
         label_angle = label_angle,
         num_rows = len(y_pos),
@@ -574,24 +574,3 @@ def generate_layout(
         max_length_mm = max_length_mm,
     )
 
-# ===========================
-# Skip Indices
-# ===========================
-def resolve_skipped_indices(
-    skip_indices: Collection[int],
-    num_cards: int,
-) -> set[int]:
-    valid_indices = {n for n in skip_indices if n < num_cards}
-    invalid_indices = set(skip_indices) - valid_indices 
-
-    if len(invalid_indices) > 0:
-        print(
-            "Ignoring skip indices that are outside range "
-            + f"0-{num_cards - 1}: {invalid_indices}"
-        )
-
-    if len(valid_indices) == num_cards:
-        raise ValueError("You cannot skip all cards per page!")
-
-    return valid_indices
- 

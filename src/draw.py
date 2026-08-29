@@ -77,7 +77,6 @@ def render_duplex_page(
     label_text: str | None, 
     label_font: ImageFont.FreeTypeFont,
 ) -> DuplexPage:
-
     
     front_page = bg_image.copy()
     back_page = bg_image.copy()
@@ -91,7 +90,12 @@ def render_duplex_page(
             font=label_font,
         )
 
-    for i, card in enumerate(processed_cards):
+    for i, valid in enumerate(page_layout.card_placements):
+        if not valid:
+            continue
+
+        card = next(iter(processed_cards))
+
         # Positions are stored as (row, col) -> (y, x)
         front_y, front_x = page_layout.card_positions[i]
         back_y, back_x = page_layout.back_positions[i]
