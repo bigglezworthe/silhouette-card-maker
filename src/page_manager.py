@@ -472,7 +472,7 @@ def resolve_card_placements(
     if len(valid_indices) == num_cards:
         raise ValueError("You cannot skip all cards per page!")
 
-    return [index not in valid_indices for index in range(num_cards)] 
+    return [index not in valid_indices for index in range(num_cards)]  
 
 def generate_layout(
     orientation: Orientation,
@@ -543,7 +543,7 @@ def generate_layout(
     max_length_mm = round(max_length_px * 25.4 / (ppi_scale * DEFAULT_PPI), 2)
     
     card_positions = build_card_positions(y_pos, x_pos)
-    back_positions = mirror_card_positions(y_pos, x_pos)
+    back_positions = mirror_card_positions(y_pos, x_pos, mirror_cols=False)
 
     card_placements = resolve_card_placements(
         skip_indices = skip_indices,

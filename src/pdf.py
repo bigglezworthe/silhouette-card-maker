@@ -14,6 +14,7 @@ from src.cards import batch_cards, load_card_side, load_cards
 from src.defaults import DEFAULT_PPI
 from src.draw import (
     DuplexPage,
+    add_borders,
     add_print_bleed,
     build_label_text,
     build_render_geometry,
@@ -241,22 +242,24 @@ def generate_pdf(
 
         duplex_page = render_duplex_page(
             bg_image=reg_image.copy(),
-            processed_cards=processed_cards,
+            card_batch=processed_cards,
             page_layout=page_layout,
             label_text=label_text,
             label_font=ImageFont.truetype(LABEL_FONT, 40 * ppi_scale),
         )
 
-        processed_duplex_page = add_print_bleed(
-            duplex_page,
-            page_layout,
-            render_geometry,
-            render_params,
-        )
+        duplex_page = add_borders(duplex_page, page_layout, render_params)
+        
+        #processed_duplex_page = add_print_bleed(
+        #    duplex_page,
+        #    page_layout,
+        #    render_geometry,
+        #    render_params,
+        #)
 
-        normalized_duplex_page = normalize_pages(processed_duplex_page, orientation)
+        duplex_page = normalize_pages(duplex_page, orientation)
 
-        pages.append(normalized_duplex_page)
+        pages.append(duplex_page)
 
     if len(pages) == 0:
         print("No pages were generated.")
