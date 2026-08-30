@@ -15,14 +15,13 @@ from src.defaults import DEFAULT_PPI
 from src.draw import (
     DuplexPage,
     add_borders,
-    add_print_bleed,
     build_label_text,
     build_render_geometry,
     draw_outlines,
     normalize_pages,
     render_duplex_page,
 )
-from src.enums import Orientation, OrientationMode, Registration, Variant
+from src.enums import Orientation, OrientationMode, Registration
 from src.images import (
     process_card_side,
     process_cards,
@@ -229,7 +228,10 @@ def generate_pdf(
         batch_cards(cards.cards, num_cards), 
         start=1,
     ):
+        print(f"Processing page {sheet_number}")
+        print("  Loading cards...")
         loaded_cards = load_cards(card_batch)
+        print("  Processing cards...")
         processed_cards = process_cards(
             loaded_cards,
             processed_card_back,
@@ -240,6 +242,7 @@ def generate_pdf(
         front_sheet_num = sheet_number if only_fronts else sheet_number * 2 - 1
         label_text = build_label_text(front_sheet_num, layout_def.template, label)
 
+        print("  Placing cards...")
         duplex_page = render_duplex_page(
             bg_image=reg_image.copy(),
             card_batch=processed_cards,
@@ -248,7 +251,11 @@ def generate_pdf(
             label_font=ImageFont.truetype(LABEL_FONT, 40 * ppi_scale),
         )
 
-        duplex_page = add_borders(duplex_page, page_layout, render_params)
+        print("  Filling gaps...")
+        duplex_page = add_borders(
+            duplex_page, 
+            page_layout, 
+        )
         
         #processed_duplex_page = add_print_bleed(
         #    duplex_page,
@@ -257,14 +264,17 @@ def generate_pdf(
         #    render_params,
         #)
 
+        print("  Normalizing page...")
         duplex_page = normalize_pages(duplex_page, orientation)
 
+        print("  Page complete.")
         pages.append(duplex_page)
 
     if len(pages) == 0:
         print("No pages were generated.")
         return
 
+    print("Drawing outlines...")
     if show_outline:
         # [!] Consolidated calls
         draw_outlines(
@@ -273,6 +283,7 @@ def generate_pdf(
             render_geometry.radius,
         )
 
+    print("Offsetting pages...")
     if load_offset:
         saved_offset = load_saved_offset()
 
@@ -288,6 +299,7 @@ def generate_pdf(
 
     images = [image for page in pages for image in (page.front, page.back)]
 
+    print("Saving...")
     if output_images:
         for i, image in enumerate(images):
             image.save(

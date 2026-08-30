@@ -30,26 +30,26 @@ def calculate_render_params(
     extend_corners_backs_px = parse_to_px(render_opts.back.extend_corners_radius, ppi_scale)
     extend_bleed_px = parse_to_px(render_opts.front.extend_bleed, ppi_scale)
     extend_bleed_backs_px = parse_to_px(render_opts.back.extend_bleed, ppi_scale)
-    
+
     fit_backs = render_opts.back.fit or render_opts.front.fit
 
     return CardRenderParams(
-       front = SideRenderParams(
-           crop = (crop_x_percent, crop_y_percent),
-           fit = render_opts.front.fit,
-           extend_edges = extend_edges_px,
-           extend_corners_radius = extend_corners_px,
-           extend_bleed = extend_bleed_px
-       ),
-       back = SideRenderParams(
-           crop = (crop_back_x_percent, crop_back_y_percent),
-           fit = fit_backs,
-           extend_edges = extend_edges_backs_px,
-           extend_corners_radius = extend_corners_backs_px,
-           extend_bleed = extend_bleed_backs_px
-       ),
-       orientation= render_opts.orientation
-   ) 
+        front = SideRenderParams(
+            crop = (crop_x_percent, crop_y_percent),
+            fit = render_opts.front.fit,
+            extend_edges = extend_edges_px,
+            extend_corners_radius = extend_corners_px,
+            extend_bleed = extend_bleed_px
+        ),
+        back = SideRenderParams(
+            crop = (crop_back_x_percent, crop_back_y_percent),
+            fit = fit_backs,
+            extend_edges = extend_edges_backs_px,
+            extend_corners_radius = extend_corners_backs_px,
+            extend_bleed = extend_bleed_backs_px
+        ),
+        orientation= render_opts.orientation
+    ) 
 
 #============================
 # Crop
@@ -223,3 +223,4 @@ def calculate_reg_params(
         length = parse_to_px(reg_opts.length, ppi_scale),
         inset = parse_to_px(reg_opts.inset, ppi_scale),
     )
+

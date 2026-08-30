@@ -527,7 +527,6 @@ def create_page_borders(
     card_placements: list[bool],
     card_width: int,
     card_height: int,
-    extend_bleed: int = 0,
 ) -> Image.Image:
     page_array = np.array(page)
 
@@ -543,6 +542,7 @@ def create_page_borders(
     occupied_x: set[int] = set()
     occupied_y: set[int] = set()
 
+
     for i, valid in enumerate(card_placements):
         if not valid:
             continue
@@ -552,36 +552,34 @@ def create_page_borders(
         occupied_x.add(x)
         occupied_y.add(y)
 
-    leftmost = min(x_pos)
-    rightmost = max(x_pos)
-    topmost = min(y_pos)
-    botmost = max(y_pos)
-
     for x in occupied_x:
         left = x
         right = x + card_width
-        left_fill = x_fill if x != leftmost else x_fill + extend_bleed
-        right_fill = x_fill if x != rightmost else x_fill + extend_bleed
-
     
-        page_array[:, left-left_fill:left] = page_array[:, left:left+1]
-        page_array[:, right:right+right_fill] = page_array[:, right-1:right]
+        page_array[:, left-x_fill:left] = (
+            page_array[:, left:left+1]
+        )
+        page_array[:, right:right+x_fill] = (
+            page_array[:, right-1:right]
+        )
     
     for y in occupied_y:
         top = y
         bot = y + card_height
-        top_fill = y_fill if y != topmost else y_fill + extend_bleed
-        bot_fill = y_fill if y != botmost else y_fill + extend_bleed
 
-        page_array[top-top_fill:top, :] = page_array[top:top+1, :]
-        page_array[bot:bot+bot_fill, :] = page_array[bot-1:bot, :]
+        page_array[top-y_fill:top, :] = ( 
+            page_array[top:top+1, :]
+        )
+
+        page_array[bot:bot + y_fill, :] = (
+            page_array[bot-1:bot, :]
+        )
 
     return Image.fromarray(page_array)
 
 def add_borders(
     duplex_page: DuplexPage,
     page_layout: PageLayout,
-    render_params: CardRenderParams,
 ) -> DuplexPage:
     return DuplexPage(
         front = create_page_borders(
@@ -590,7 +588,6 @@ def add_borders(
             page_layout.card_placements,
             page_layout.card_width_px,
             page_layout.card_height_px,
-            render_params.front.extend_bleed,
         ),
         back = create_page_borders(
             duplex_page.back,
@@ -598,6 +595,5 @@ def add_borders(
             page_layout.card_placements,
             page_layout.card_width_px,
             page_layout.card_height_px,
-            render_params.back.extend_bleed,
         ),
     )
