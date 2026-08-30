@@ -6,45 +6,11 @@ import math
 
 from pathlib import Path
 
-from PIL import ImageFont
-
-from src.paths import Paths
-from src.calcs import calculate_reg_params, calculate_render_params
-from src.cards import batch_cards, load_card_side, load_cards
 from src.defaults import DEFAULT_PPI
-from src.draw import (
-    DuplexPage,
-    add_borders,
-    build_label_text,
-    build_render_geometry,
-    draw_outlines,
-    normalize_pages,
-    render_duplex_page,
-)
-from src.enums import Orientation, OrientationMode, Registration
-from src.images import (
-    process_card_side,
-    process_cards,
-)
-from src.layout_models import ResolvedLayout
-from src.layouts import (
-    DEFAULT_ORIENTATION,
-    load_defaults,
-)
-from src.measurements import parse_to_mm, parse_to_px
-from src.offset import load_saved_offset
-from src.page_manager import (
-    REG_PADDING_MM,
-    generate_layout,
-    generate_reg_mark,
-    resolve_reg_opts,
-)
-from src.paths import ImagePaths
-from src.render_models import CardRenderOptions, Cards, PageLayout
-
-LABEL_FONT = Paths.assets / "arial.ttf"
-
-
+from src.draw import (DuplexPage)
+from src.enums import Orientation, OrientationMode
+from src.page_manager import (generate_layout)
+from src.render_models import PageLayout
 
 # [!] Might belong in layout.py?
 def find_best_orientation(
@@ -97,207 +63,14 @@ def find_best_orientation(
 
 
 def generate_pdf(
-    image_paths: ImagePaths,
-    cards: Cards,
-    layout_def: ResolvedLayout,
+    duplex_pages: list[DuplexPage],
     output_path: Path,
     output_images: bool,
-    card_size_name: str,
-    paper_size_name: str,
-    registration: Registration,
-    only_fronts: bool,
-    render_opts: CardRenderOptions,
     ppi_scale: float,
     quality: int,
-    skip_indices: list[int],
-    load_offset: bool,
-    label: str,
-    show_outline: bool = False,
-    borderless: bool = False,
 ) -> None:
-    # ========================
-    # The Goal
-    # ------------------------
-    # defaults = load_defaults()
-    # layout = prepare_layout(...)
-    # geometry = prepare_geometry(layout, defaults, ppi)
-    # render_params = prepare_render_params(render_opts, geometry, ppi)
-    # cards = load_cards(image_paths, ...)
-    # cards = process_cards(cards, ...)
-    # pages = render_pages(
-    #     cards = cards,
-    #     layout=layout,
-    #     geometry=geometry,
-    #     render_params=render_params,
-    #     ...
-    # )
-    # save_output(pages, ...) load_defaults()
-    # ========================
 
-    # ==============================
-    # Image modification
-    # ==============================
-    defaults = load_defaults()
-    default_reg = (
-        defaults.registration.borderless
-        if borderless
-        else defaults.registration.default
-    )
-
-    # Uses default length rather than effective length?
-    total_exclusion_mm = parse_to_mm(default_reg.length) + REG_PADDING_MM
-    total_exclusion = f"{total_exclusion_mm}mm"
-
-    reg_opts = resolve_reg_opts(
-        default_reg,
-        layout_def.registration,
-    )
-
-    card_size_def = layout_def.card_size
-    paper_size_def = layout_def.paper_size
-
-    orientation = layout_def.orientation or DEFAULT_ORIENTATION
-
-    # [!] skip_indices can be immediately validated as set
-    page_layout = generate_layout(
-        orientation=orientation,
-        card_width=card_size_def.width,
-        card_height=card_size_def.height,
-        paper_width=paper_size_def.width,
-        paper_height=paper_size_def.height,
-        inset=reg_opts.inset,
-        thickness=reg_opts.thickness,
-        length=total_exclusion,
-        ppi_scale=ppi_scale,
-        skip_indices=skip_indices,
-        borderless=borderless,
-    )
-
-    render_params = calculate_render_params(
-        render_opts=render_opts,
-        card_size_def=card_size_def,
-        ppi_scale=ppi_scale,
-    )
-
-    reg_params = calculate_reg_params(reg_opts=reg_opts, ppi_scale=ppi_scale)
-
-    num_cards = sum(page_layout.card_placements)
-    if num_cards == 0:
-        raise ValueError(
-            f'Card size "{card_size_name}" does not fit on paper size "{paper_size_name}".'
-        ) 
-
-    # ==============================
-    # Registration
-    # ==============================
-    reg_image = generate_reg_mark(
-        paper_width=paper_size_def.width,
-        paper_height=paper_size_def.height,
-        reg_opts=reg_opts,
-        dpi_scale=ppi_scale,
-        layout_def=layout_def,
-        registration=registration,
-    )
-
-    # ==============================
-    # Render Pages
-    # ==============================
-    pages: list[DuplexPage] = []
-
-    radius_px = parse_to_px(card_size_def.radius or defaults.card_radius, ppi_scale)
-
-    render_geometry = build_render_geometry(
-        page_layout=page_layout,
-        reg_params=reg_params,
-        radius=radius_px,
-        borderless=borderless,
-    )
-
-    # [!] Load and process cards by page to minimize RAM usage
-    # [!] but keep cards.default_back loaded
-    processed_card_back = None
-
-    if not only_fronts:
-        if cards.default_back:
-            loaded_card_back = load_card_side(cards.default_back)
-            processed_card_back = process_card_side(
-                loaded_card_back, render_params.back, render_geometry
-            )
-
-    for sheet_number, card_batch in enumerate(
-        batch_cards(cards.cards, num_cards), 
-        start=1,
-    ):
-        print(f"Processing page {sheet_number}")
-        print("  Loading cards...")
-        loaded_cards = load_cards(card_batch)
-        print("  Processing cards...")
-        processed_cards = process_cards(
-            loaded_cards,
-            processed_card_back,
-            render_params,
-            render_geometry,
-        )
-
-        front_sheet_num = sheet_number if only_fronts else sheet_number * 2 - 1
-        label_text = build_label_text(front_sheet_num, layout_def.template, label)
-
-        print("  Placing cards...")
-        duplex_page = render_duplex_page(
-            bg_image=reg_image.copy(),
-            card_batch=processed_cards,
-            page_layout=page_layout,
-            label_text=label_text,
-            label_font=ImageFont.truetype(LABEL_FONT, 40 * ppi_scale),
-        )
-
-        print("  Filling gaps...")
-        duplex_page = add_borders(
-            duplex_page, 
-            page_layout, 
-        )
-        
-        #processed_duplex_page = add_print_bleed(
-        #    duplex_page,
-        #    page_layout,
-        #    render_geometry,
-        #    render_params,
-        #)
-
-        print("  Normalizing page...")
-        duplex_page = normalize_pages(duplex_page, orientation)
-
-        print("  Page complete.")
-        pages.append(duplex_page)
-
-    if len(pages) == 0:
-        print("No pages were generated.")
-        return
-
-    print("Drawing outlines...")
-    if show_outline:
-        # [!] Consolidated calls
-        draw_outlines(
-            pages,
-            page_layout,
-            render_geometry.radius,
-        )
-
-    print("Offsetting pages...")
-    if load_offset:
-        saved_offset = load_saved_offset()
-
-        if saved_offset is None:
-            print("Offset cannot be applied")
-        else:
-            print(
-                "Loaded offsets:"
-                + f"x={saved_offset.x_offset},"
-                + f"y={saved_offset.y_offset},"
-                + f"angle={saved_offset.angle_offset}"
-            )
-
-    images = [image for page in pages for image in (page.front, page.back)]
+    images = [image for page in duplex_pages for image in (page.front, page.back)]
 
     print("Saving...")
     if output_images:

@@ -131,15 +131,13 @@ def process_card_side(
         offset_y = 0
 
     extend_edges = render_params.extend_edges
-    if extend_edges > 0:
+    if extend_edges >= 0:
         image = image.crop((
             extend_edges, extend_edges, 
             image.width - extend_edges, image.height - extend_edges
         ))
 
-    extend_corners = render_params.extend_corners_radius
-    if extend_corners > 0:
-        image = fill_rounded_corners(image, render_params.extend_corners_radius)
+    image = fill_rounded_corners(image, render_params.extend_corners_radius)
 
     return ProcessedCardSide(
         image = image,
