@@ -13,10 +13,6 @@ from src.paths import ImagePaths, get_relative_stem, index_image_paths, select_b
 from src.render_models import Card, CardSide, Cards
 
 #============================
-# Classes  
-#============================
-
-#============================
 # Find Cards
 #============================
 def find_cards(image_dirs: ImagePaths, only_front_images: bool = False) -> Cards:

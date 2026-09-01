@@ -4,21 +4,19 @@
 # ==============================================================================
 import numpy as np
 
-from dataclasses import dataclass
 from itertools import pairwise
 
 from PIL import Image, ImageDraw, ImageFont
 
 from src.enums import Orientation
-from src.images import MINIMUM_BLEED, calculate_max_print_bleed
-from src.render_models import CardRenderParams, RenderGeometry, PageLayout, RegistrationParams, ProcessedCard, ProcessedCardSide
+from src.images import calculate_max_print_bleed
+from src.render_models import CardRenderParams, DuplexPage, RenderGeometry, PageLayout, RegistrationParams, ProcessedCard, ProcessedCardSide
 
 
 #============================
 # Options
 #============================
 # Measurement strings to be parsed
-
 
 def build_render_geometry(
     page_layout: PageLayout,
@@ -31,16 +29,16 @@ def build_render_geometry(
     else:
         label_margin_px = reg_params.inset - (2 * reg_params.thickness)
 
-    max_print_bleed = calculate_max_print_bleed(
+    x_bleed, y_bleed = calculate_max_print_bleed(
         page_layout.card_positions, 
-        page_layout.card_width_px, page_layout.card_height_px, 
-        MINIMUM_BLEED,
+        page_layout.card_width_px, 
+        page_layout.card_height_px, 
     )
 
     return RenderGeometry(
         page_layout = page_layout,
-        max_print_bleed_width = max_print_bleed[0],
-        max_print_bleed_height = max_print_bleed[1],
+        x_fill = x_bleed,
+        y_fill = y_bleed,
         radius = radius,
         label_margin = label_margin_px,
     )
@@ -48,14 +46,9 @@ def build_render_geometry(
 #============================
 # Page
 #============================
-@dataclass(frozen=True)
-class DuplexPage:
-    front: Image.Image
-    back:  Image.Image
-
 
 def build_label_text(sheet_number: int, template: str | None, label: str | None) -> str:
-    text = f"sheet: {sheet_number}, template: {template or ""}"
+    text = f'sheet: {sheet_number}, template: {template or ""}'
     if label:
         text = f"label: {label}, {text}"
     return text
@@ -75,35 +68,33 @@ def normalize_pages(
 def render_duplex_page(
     bg_image: Image.Image,
     card_batch: list[ProcessedCard],
-    page_layout: PageLayout,
-    label_text: str | None, 
-    label_font: ImageFont.FreeTypeFont,
+    geometry: RenderGeometry,
 ) -> DuplexPage:
     
     front_page = bg_image.copy()
     back_page = bg_image.copy()
 
-    if label_text is not None: 
-        draw_front_label(
-            page=front_page,
-            text=label_text,
-            position=page_layout.label_position,
-            angle=page_layout.label_angle,
-            font=label_font,
-        )
+    page_layout = geometry.page_layout
 
-    positions = (i for i, valid in enumerate(page_layout.card_placements) if valid)
+    # [!] Does this properly account for all cases? If padding = 0?
+    first_y, first_x = page_layout.card_positions[0]
+    print(f"    Grid origins: {first_x}, {first_y}")
 
+    positions = (i for i, valid in enumerate(page_layout.card_placements) if valid) 
     for card in card_batch:
         pos = next(positions)
 
         # Positions are stored as (row, col) -> (y, x)
         front_y, front_x = page_layout.card_positions[pos]
         back_y, back_x = page_layout.back_positions[pos]
+        
+        grid_x = front_x - first_x
+        grid_y = front_y - first_y
+        print(f"      Placing card in position {pos} at: {grid_x}, {grid_y}")
 
         front_page.paste(
             card.front.image,
-            (front_x + card.front.offset_x, front_y + card.front.offset_y),
+            (front_x - first_x, front_y - first_y),
         )
 
         if card.back is None:
@@ -111,12 +102,11 @@ def render_duplex_page(
 
         back_page.paste(
             card.back.image,
-            (back_x + card.back.offset_x, back_y + card.back.offset_y),
+            (back_x - first_x, back_y - first_y),
         )
     
-
+    print(f"      Grid Size: {front_page.size}")
     return DuplexPage(front_page, back_page)
-
 
 #============================
 # Bleed
@@ -597,3 +587,19 @@ def add_borders(
             page_layout.card_height_px,
         ),
     )
+     
+def add_label(
+    duplex_page: DuplexPage,
+    page_layout: PageLayout,
+    label_text: str,
+    label_font: ImageFont.FreeTypeFont,
+) -> DuplexPage:
+    front_page = duplex_page.front
+    draw_front_label(
+        page=front_page,
+        text=label_text,
+        position=page_layout.label_position,
+        angle=page_layout.label_angle,
+        font=label_font,
+    )
+    return DuplexPage(front_page, duplex_page.back) 

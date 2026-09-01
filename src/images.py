@@ -2,41 +2,38 @@
 # images.py
 #     Place images on the page and perform non-crop manipulations
 # ==============================================================================
-from itertools import pairwise
 import math
+import numpy as np
 
 from PIL import Image
 
 from src.calcs import crop_and_scale_image
 from src.enums import FitMode
-from src.measurements import parse_measurement
-from src.render_models import CardRenderParams, RenderGeometry, SideRenderParams, Card, CardSide, ProcessedCard, ProcessedCardSide
+from src.render_models import CardRenderParams, RenderGeometry, SideRenderParams, Card, CardSide, ProcessedCard, ProcessedCardSide, DuplexPage
 
 # Approximately 1.25mm of bleed in px assuming 300ppi: ceil(1.25mm * 1in/25.4mm * 300px/1in)
-# [!] rename to DEFAULT_PRINT_BLEED
-MINIMUM_BLEED = 15
+MINIMUM_PRINT_BLEED = 15
 
-
-
+# [!] Cannot move to calcs.py because of import cycle
 def calculate_max_print_bleed(
     positions: list[tuple[int,int]],
     width: int,
-    height: int,
-    fallback_bleed: int = MINIMUM_BLEED
+    height: int, 
 ) -> tuple[int, int]:
+    # [!] Should be scaled by ppi_scale
+    default_bleed = MINIMUM_PRINT_BLEED 
+
     rows = sorted({row for row, _ in positions})
     cols = sorted({col for _, col in positions})
 
-    def max_bleed(positions: list[int], size: int) -> int:
-        if len(positions) < 2:
-            return fallback_bleed
+    def max_bleed(pos: list[int], size: int) -> int:
+        if len(pos) < 2:
+            return default_bleed
 
-        gaps = [
-            current - previous - size
-            for previous, current in pairwise(positions)
-        ]
-
-        return max(fallback_bleed, math.ceil(min(gaps) / 2))
+        min_gap = min(pos[i+1] - pos[i] - size for i in range(len(pos)-1))
+        assert min_gap >= 0
+        
+        return math.ceil(min_gap / 2)
 
     return max_bleed(cols, width), max_bleed(rows, height)
 
@@ -95,7 +92,18 @@ def convert_inch_to_crop(
 
     return (crop_x_percent, crop_y_percent)
 
+def pad_image(
+    image: Image.Image,
+    x_padding: int,
+    y_padding: int,
+) -> Image.Image:
+    padding = (
+        (y_padding, y_padding),
+        (x_padding, x_padding),
+        (0, 0),
+    )
 
+    return Image.fromarray(np.pad(np.array(image), padding, mode="edge"))
 
 def process_card_side(
     card_side: CardSide,
@@ -110,6 +118,7 @@ def process_card_side(
     crop_percent_x, crop_percent_y = render_params.crop
 
 
+    # [!] CropResult doesn't seem necessary.
     if crop_percent_x > 0 or crop_percent_y > 0 or render_params.fit == FitMode.CROP:
         crop_result = crop_and_scale_image(
             image,
@@ -117,8 +126,8 @@ def process_card_side(
             crop_percent_y,
             geometry.page_layout.card_width_px,
             geometry.page_layout.card_height_px,
-            geometry.max_print_bleed_width,
-            geometry.max_print_bleed_height,
+            geometry.x_fill,
+            geometry.y_fill,
             render_params.fit,
         )
     
@@ -131,13 +140,21 @@ def process_card_side(
         offset_y = 0
 
     extend_edges = render_params.extend_edges
-    if extend_edges >= 0:
+    if extend_edges > 0:
         image = image.crop((
             extend_edges, extend_edges, 
             image.width - extend_edges, image.height - extend_edges
         ))
 
-    image = fill_rounded_corners(image, render_params.extend_corners_radius)
+    if render_params.extend_corners_radius > 0:
+        image = fill_rounded_corners(image, render_params.extend_corners_radius)
+
+    # 0 >= offset >= -fill  
+    x_padding = geometry.x_fill + offset_x
+    y_padding = geometry.y_fill + offset_y
+    assert x_padding >= 0, x_padding 
+    assert y_padding >= 0, y_padding
+    image = pad_image(image, x_padding, y_padding)
 
     return ProcessedCardSide(
         image = image,
@@ -162,3 +179,12 @@ def process_cards(
 
     return processed
 
+def pad_duplex_page(
+    duplex_page: DuplexPage,
+    x_padding: int,
+    y_padding: int,
+) -> DuplexPage:
+    return DuplexPage(
+        front=pad_image(duplex_page.front, x_padding, y_padding),
+        back=pad_image(duplex_page.back, x_padding, y_padding),
+    )

@@ -10,7 +10,6 @@
 # [ ] compact code
 # ================================================
 from collections.abc import Collection
-from dataclasses import dataclass
 import math
 
 from PIL import Image, ImageDraw
@@ -19,7 +18,7 @@ from enum import Enum
 from src.layout_models import RegistrationSettings, ResolvedLayout, ResolvedRegistrationSettings
 from src.enums import Orientation, Registration
 from src.measurements import DEFAULT_PPI, parse_to_px
-from src.render_models import CardPlacement, PageLayout
+from src.render_models import PageLayout, RenderGeometry, DuplexPage
 
 # [!] Enum? Dataclass?
 # Registration mark constraints (in mm)
@@ -105,7 +104,7 @@ def generate_reg_mark(
     inset_px = min(inset_px, max_reg_inset_px)
 
     # Create image sized to the paper dimensions
-    img = Image.new("RGB", (int(paper_width_px), int(paper_height_px)), "white")
+    img = Image.new("RGB", (paper_width_px, paper_height_px), "white")
     draw = ImageDraw.Draw(img)
 
     # Corners to draw L's on.
@@ -573,4 +572,39 @@ def generate_layout(
         num_cols = len(x_pos),
         max_length_mm = max_length_mm,
     )
+
+def get_canvas_bounds(geometry: RenderGeometry) -> tuple[int, int, int, int]:
+    page_layout = geometry.page_layout
+    cols = [x for _, x in page_layout.card_positions]
+    rows = [y for y, _ in page_layout.card_positions]
+
+    left = min(cols) - geometry.x_fill
+    top = min(rows) - geometry.y_fill
+    right = max(cols) + page_layout.card_width_px + geometry.x_fill
+    bottom = max(rows) + page_layout.card_height_px + geometry.y_fill
+
+    return left, top, right, bottom
+
+
+def build_canvas(bounds: tuple[int, int, int, int]) -> Image.Image: 
+    canvas_width = bounds[2] - bounds[0]
+    canvas_height = bounds[3] - bounds[1]
+
+    return Image.new("RGB", (canvas_width, canvas_height), "white")
+
+def add_reg(
+    duplex_page: DuplexPage,
+    reg_image: Image.Image,
+    bounds: tuple[int, int, int, int],
+) -> DuplexPage:
+    front_reg = reg_image.copy()
+    back_reg = reg_image.copy()
+    front_reg.paste(duplex_page.front, (bounds[0], bounds[1]))
+    back_reg.paste(duplex_page.back, (bounds[0], bounds[1]))
+
+    return DuplexPage(
+        front = front_reg,
+        back = back_reg,
+    )
+
 

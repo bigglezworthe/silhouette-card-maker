@@ -7,21 +7,24 @@ from src.calcs import calculate_reg_params, calculate_render_params
 from src.cards import batch_cards, find_cards, load_card_side, load_cards
 from src.draw import (
     DuplexPage, 
-    add_borders, 
     build_label_text, 
-    build_render_geometry, 
+    build_render_geometry,
+    draw_front_label, 
     draw_outlines, 
     normalize_pages, 
     render_duplex_page,
 )
 from src.enums import Orientation, Registration, FitMode 
-from src.images import process_card_side, process_cards
+from src.images import pad_duplex_page, process_card_side, process_cards
 from src.measurements import DEFAULT_PPI, parse_to_mm, parse_to_px 
 from src.offset import load_saved_offset
 from src.page_manager import (
-    REG_PADDING_MM, 
+    REG_PADDING_MM,
+    add_reg,
+    build_canvas, 
     generate_layout, 
-    generate_reg_mark, 
+    generate_reg_mark,
+    get_canvas_bounds, 
     resolve_reg_opts,
 )
 from src.paths import ImagePaths, Paths, prepare_output_path
@@ -243,6 +246,12 @@ def cli(
         borderless=borderless,
     )
 
+    # [!] Card positions is nice for placement, but x_pos and y_pos are useful elsewhere
+    canvas_bounds = get_canvas_bounds(render_geometry)
+    print("Canvas Bounds:", canvas_bounds)
+    blank_canvas = build_canvas(canvas_bounds)
+    print("Canvas Size:", blank_canvas.size)
+
     # [!] Load and process cards by page to minimize RAM usage
     # [!] but keep cards.default_back loaded
     processed_card_back = None
@@ -274,18 +283,42 @@ def cli(
 
         print("  Placing cards...")
         duplex_page = render_duplex_page(
-            bg_image=reg_image.copy(),
+            bg_image=blank_canvas.copy(),
             card_batch=processed_cards,
-            page_layout=page_layout,
-            label_text=label_text,
-            label_font=ImageFont.truetype(LABEL_FONT, 40 * ppi_scale),
+            geometry=render_geometry,
         )
 
-        print("  Filling gaps...")
-        duplex_page = add_borders(
-            duplex_page, 
-            page_layout, 
+        # [!] Placing this here to avoid cyclic imports: draw <-> images
+        print("  Adding print bleed...")
+        duplex_page = pad_duplex_page(
+            duplex_page,
+            render_geometry.x_fill,
+            render_geometry.y_fill,
         )
+
+        print("  Adding registration...")
+        print("  Reg Image size:", reg_image.size)
+        duplex_page = add_reg(
+            duplex_page,
+            reg_image,
+            canvas_bounds,
+        )
+
+        print("  Adding label...")
+        draw_front_label(
+            page=duplex_page.front,
+            text=label_text,
+            position=page_layout.label_position,
+            angle=page_layout.label_angle,
+            font=ImageFont.truetype(LABEL_FONT, 40 * ppi_scale),
+        )
+
+
+        #print("  Filling gaps...")
+        #duplex_page = add_borders(
+        #    duplex_page, 
+        #    page_layout, 
+        #)
         
         #processed_duplex_page = add_print_bleed(
         #    duplex_page,

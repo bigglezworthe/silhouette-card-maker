@@ -45,6 +45,11 @@ class CardPlacement:
 # draw.py
 #==========================================================
 
+@dataclass(frozen=True)
+class DuplexPage:
+    front: Image.Image
+    back:  Image.Image
+
 #============================
 # Options
 #============================
@@ -91,8 +96,8 @@ class CardRenderParams:
 @dataclass(frozen=True)
 class RenderGeometry:
     page_layout: PageLayout
-    max_print_bleed_width: int
-    max_print_bleed_height: int
+    x_fill: int
+    y_fill: int
     radius: int
     label_margin: int
 
