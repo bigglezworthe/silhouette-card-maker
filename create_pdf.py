@@ -313,20 +313,6 @@ def cli(
             font=ImageFont.truetype(LABEL_FONT, 40 * ppi_scale),
         )
 
-
-        #print("  Filling gaps...")
-        #duplex_page = add_borders(
-        #    duplex_page, 
-        #    page_layout, 
-        #)
-        
-        #processed_duplex_page = add_print_bleed(
-        #    duplex_page,
-        #    page_layout,
-        #    render_geometry,
-        #    render_params,
-        #)
-
         print("  Normalizing page...")
         duplex_page = normalize_pages(duplex_page, orientation)
 

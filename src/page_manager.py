@@ -573,38 +573,5 @@ def generate_layout(
         max_length_mm = max_length_mm,
     )
 
-def get_canvas_bounds(geometry: RenderGeometry) -> tuple[int, int, int, int]:
-    page_layout = geometry.page_layout
-    cols = [x for _, x in page_layout.card_positions]
-    rows = [y for y, _ in page_layout.card_positions]
-
-    left = min(cols) - geometry.x_fill
-    top = min(rows) - geometry.y_fill
-    right = max(cols) + page_layout.card_width_px + geometry.x_fill
-    bottom = max(rows) + page_layout.card_height_px + geometry.y_fill
-
-    return left, top, right, bottom
-
-
-def build_canvas(bounds: tuple[int, int, int, int]) -> Image.Image: 
-    canvas_width = bounds[2] - bounds[0]
-    canvas_height = bounds[3] - bounds[1]
-
-    return Image.new("RGB", (canvas_width, canvas_height), "white")
-
-def add_reg(
-    duplex_page: DuplexPage,
-    reg_image: Image.Image,
-    bounds: tuple[int, int, int, int],
-) -> DuplexPage:
-    front_reg = reg_image.copy()
-    back_reg = reg_image.copy()
-    front_reg.paste(duplex_page.front, (bounds[0], bounds[1]))
-    back_reg.paste(duplex_page.back, (bounds[0], bounds[1]))
-
-    return DuplexPage(
-        front = front_reg,
-        back = back_reg,
-    )
 
 

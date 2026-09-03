@@ -21,7 +21,7 @@ T = TypeVar("T", bound=BaseModel)
 #============================
 # [!] Asserting that this must exist. 
 class RegistrationSettings(BaseModel):
-    inset: str | None = None
+    inset: str | None = None 
     thickness: str | None = None
     length: str | None = None
 

@@ -8,34 +8,9 @@ import numpy as np
 from PIL import Image
 
 from src.calcs import crop_and_scale_image
+from src.defaults import MINIMUM_PRINT_BLEED
 from src.enums import FitMode
 from src.render_models import CardRenderParams, RenderGeometry, SideRenderParams, Card, CardSide, ProcessedCard, ProcessedCardSide, DuplexPage
-
-# Approximately 1.25mm of bleed in px assuming 300ppi: ceil(1.25mm * 1in/25.4mm * 300px/1in)
-MINIMUM_PRINT_BLEED = 15
-
-# [!] Cannot move to calcs.py because of import cycle
-def calculate_max_print_bleed(
-    positions: list[tuple[int,int]],
-    width: int,
-    height: int, 
-) -> tuple[int, int]:
-    # [!] Should be scaled by ppi_scale
-    default_bleed = MINIMUM_PRINT_BLEED 
-
-    rows = sorted({row for row, _ in positions})
-    cols = sorted({col for _, col in positions})
-
-    def max_bleed(pos: list[int], size: int) -> int:
-        if len(pos) < 2:
-            return default_bleed
-
-        min_gap = min(pos[i+1] - pos[i] - size for i in range(len(pos)-1))
-        assert min_gap >= 0
-        
-        return math.ceil(min_gap / 2)
-
-    return max_bleed(cols, width), max_bleed(rows, height)
 
 
 def fill_rounded_corners(card_image: Image.Image, corner_radius: int) -> Image.Image:
@@ -79,18 +54,6 @@ def fill_rounded_corners(card_image: Image.Image, corner_radius: int) -> Image.I
                     except (IndexError, ValueError):
                         pass
     return result
-
-def convert_inch_to_crop(
-    crop_in: float, card_width_px: int, card_height_px: int
-) -> tuple[float, float]:
-    # Card dimensions are based on 300 ppi
-    card_width_in = card_width_px / 300
-    card_height_in = card_height_px / 300
-
-    crop_x_percent = 2 * crop_in / card_width_in * 100
-    crop_y_percent = 2 * crop_in / card_height_in * 100
-
-    return (crop_x_percent, crop_y_percent)
 
 def pad_image(
     image: Image.Image,

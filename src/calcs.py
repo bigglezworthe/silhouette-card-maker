@@ -3,7 +3,8 @@ import math
 
 from PIL import Image
 
-from src.render_models import CardRenderOptions, CardRenderParams, SideRenderParams, RegistrationParams
+from src.defaults import MINIMUM_PRINT_BLEED
+from src.render_models import CardRenderOptions, CardRenderParams, RenderGeometry, SideRenderParams, RegistrationParams
 from src.enums import FitMode
 from src.layout_models import CardSizeDef, ResolvedRegistrationSettings
 from src.measurements import parse_measurement, parse_to_in, parse_to_mm, parse_to_px
@@ -224,3 +225,38 @@ def calculate_reg_params(
         inset = parse_to_px(reg_opts.inset, ppi_scale),
     )
 
+def get_canvas_bounds(geometry: RenderGeometry) -> tuple[int, int, int, int]:
+    page_layout = geometry.page_layout
+    cols = [x for _, x in page_layout.card_positions]
+    rows = [y for y, _ in page_layout.card_positions]
+
+    left = min(cols) - geometry.x_fill
+    top = min(rows) - geometry.y_fill
+    right = max(cols) + page_layout.card_width_px + geometry.x_fill
+    bottom = max(rows) + page_layout.card_height_px + geometry.y_fill
+
+    return left, top, right, bottom
+
+
+# [!] Cannot move to calcs.py because of import cycle
+def calculate_max_print_bleed(
+    positions: list[tuple[int,int]],
+    width: int,
+    height: int, 
+) -> tuple[int, int]:
+    # [!] Should be scaled by ppi_scale
+    default_bleed = MINIMUM_PRINT_BLEED
+
+    rows = sorted({row for row, _ in positions})
+    cols = sorted({col for _, col in positions})
+
+    def max_bleed(pos: list[int], size: int) -> int:
+        if len(pos) < 2:
+            return default_bleed
+
+        min_gap = min(pos[i+1] - pos[i] - size for i in range(len(pos)-1))
+        assert min_gap >= 0
+        
+        return math.ceil(min_gap / 2)
+
+    return max_bleed(cols, width), max_bleed(rows, height)

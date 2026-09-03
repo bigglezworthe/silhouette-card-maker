@@ -24,22 +24,10 @@ class PageLayout:
     max_length_mm: float 
 
 @dataclass(frozen=True)
-class RegistrationOptions:
-    thickness: str
-    inset: str
-    length: str
-
-@dataclass(frozen=True)
 class RegistrationParams:
     thickness: int
     inset: int
     length: int
-
-@dataclass(frozen=True)
-class CardPlacement:
-    row: int
-    col: int
-    card_index: int | None
 
 #==========================================================
 # draw.py
@@ -132,22 +120,3 @@ class ProcessedCardSide:
 class ProcessedCard:
     front: ProcessedCardSide
     back: ProcessedCardSide | None
-
-@dataclass
-class ProcessedCards:
-    cards: list[ProcessedCard]
-
-#==========================================================
-# images.py
-#==========================================================
-@dataclass(frozen=True)
-class CardRenderGeometry:
-    width: int
-    height: int
-    print_bleed_x: int
-    print_bleed_y: int
-    ppi_scale: float
-
-#==========================================================
-# misc
-#==========================================================
