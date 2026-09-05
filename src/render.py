@@ -3,10 +3,15 @@
 #     Drawing onto the page.
 # ==============================================================================
 
+import math
+
 from PIL import Image, ImageDraw, ImageFont
 
-from src.enums import Orientation
-from src.images import calculate_max_print_bleed
+from src.defaults import MAX_REG_INSET_MM, MAX_REG_LENGTH_MM, MAX_REG_THICKNESS_MM, MIN_REG_LENGTH_MM, MIN_REG_THICKNESS_MM
+from src.enums import CornerMatrix, Orientation, Registration
+from src.calcs import calculate_max_print_bleed
+from src.layout_models import ResolvedLayout, ResolvedRegistrationSettings
+from src.measurements import parse_to_px
 from src.render_models import (
     DuplexPage, 
     RenderGeometry, 
@@ -14,6 +19,7 @@ from src.render_models import (
     RegistrationParams, 
     ProcessedCard
 )
+
 
 #============================
 # Options
@@ -240,6 +246,10 @@ def build_canvas(bounds: tuple[int, int, int, int]) -> Image.Image:
 
     return Image.new("RGB", (canvas_width, canvas_height), "white")
 
+#============================
+# Registration
+#============================
+
 def add_reg(
     duplex_page: DuplexPage,
     reg_image: Image.Image,
@@ -254,6 +264,111 @@ def add_reg(
         front = front_reg,
         back = back_reg,
     )
+
+def draw_reg_corner_lines(
+    draw: ImageDraw.ImageDraw,
+    x: int,
+    y: int,
+    length: int,
+    thickness: int,
+    x_dir: int,
+    y_dir: int,
+) -> None:
+
+    offset = thickness // 2
+    effective_length = length + offset
+
+    x += x_dir * offset
+    y -= y_dir * offset 
+
+    points = [
+        (x, y),
+        (x - x_dir * effective_length, y),
+        (x - x_dir * effective_length, y + y_dir * thickness),
+        (x - x_dir * thickness, y + y_dir * thickness),
+        (x - x_dir * thickness, y + y_dir * effective_length),
+        (x, y + y_dir * effective_length),
+    ]
+
+    draw.polygon(points, fill="black")
+
+def generate_reg_mark(
+    paper_width: str,
+    paper_height: str,
+    reg_opts: ResolvedRegistrationSettings,
+    dpi_scale: float,
+    layout_def: ResolvedLayout,
+    registration: Registration,
+) -> Image.Image:
+
+    # Refactor: matplotlib -> PIL
+    # Pillow measures in px, MPL in mm.
+
+    is_portrait = layout_def.registration_orientation == Orientation.PORTRAIT
+    if is_portrait:
+        paper_width, paper_height = paper_height, paper_width
+
+    # Normalize units to pixel
+    paper_width_px = parse_to_px(paper_width, dpi_scale)
+    paper_height_px = parse_to_px(paper_height, dpi_scale)
+    inset_px = parse_to_px(reg_opts.inset, dpi_scale)
+    thickness_px = parse_to_px(reg_opts.thickness, dpi_scale)
+    length_px = parse_to_px(reg_opts.length, dpi_scale)
+    
+    min_reg_length_px = parse_to_px(f"{MIN_REG_LENGTH_MM}mm", dpi_scale)
+    max_reg_length_px = parse_to_px(f"{MAX_REG_LENGTH_MM}mm", dpi_scale)
+    min_reg_thickness_px = parse_to_px(f"{MIN_REG_THICKNESS_MM}mm", dpi_scale)
+    max_reg_thickness_px = parse_to_px(f"{MAX_REG_THICKNESS_MM}mm", dpi_scale)
+    max_reg_inset_px = parse_to_px(f"{MAX_REG_INSET_MM}mm", dpi_scale)
+
+    # Constrain registration mark parameters within valid ranges.
+    length_px = max(min_reg_length_px, min(length_px, max_reg_length_px))
+    thickness_px = max(min_reg_thickness_px, min(thickness_px, max_reg_thickness_px))
+    inset_px = min(inset_px, max_reg_inset_px)
+
+    # Create image sized to the paper dimensions
+    img = Image.new("RGB", (paper_width_px, paper_height_px), "white")
+    draw = ImageDraw.Draw(img)
+
+    # Corners to draw L's on.
+    render_corners = [CornerMatrix.BOTTOM_LEFT, CornerMatrix.TOP_RIGHT]
+
+    if registration == Registration.THREE:
+        five = parse_to_px("5mm", dpi_scale)
+        pil_offset = thickness_px // 2
+        coords = [ 
+            (inset_px - pil_offset, inset_px - pil_offset), 
+            (inset_px + five + pil_offset, inset_px + five + pil_offset) 
+        ]
+        draw.rectangle(
+            coords,
+            fill="black"
+        )
+
+    else:  # Registration.FOUR
+        render_corners.append(CornerMatrix.TOP_LEFT)
+        render_corners.append(CornerMatrix.BOTTOM_RIGHT)
+
+    for corner in render_corners:
+        x_dir, y_dir = corner.value
+        x = inset_px if x_dir < 0 else paper_width_px - inset_px
+        y = inset_px if y_dir > 0 else paper_height_px - inset_px
+
+        draw_reg_corner_lines(
+            draw,
+            x=x,
+            y=y,
+            length=length_px,
+            thickness=thickness_px,
+            x_dir=x_dir,
+            y_dir=y_dir,
+        )
+    
+    img = img.resize([math.floor(img.width * dpi_scale), math.floor(img.height * dpi_scale)])
+
+    if layout_def.orientation != layout_def.registration_orientation:
+        img = img.rotate(90 if is_portrait else -90, expand=True)
+    return img
 
 
 

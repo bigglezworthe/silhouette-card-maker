@@ -8,7 +8,6 @@ import numpy as np
 from PIL import Image
 
 from src.calcs import crop_and_scale_image
-from src.defaults import MINIMUM_PRINT_BLEED
 from src.enums import FitMode
 from src.render_models import CardRenderParams, RenderGeometry, SideRenderParams, Card, CardSide, ProcessedCard, ProcessedCardSide, DuplexPage
 
